@@ -67,14 +67,8 @@ public final class PhaseLock implements AnalogTunerLock {
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
-
 		tuningLowPass.accept(out, phaseDetector);
 		tuningLowPass.accept(previous, frequencyDetector);
-
-		// phaseDetector.in= phaseDetector.in * (1-frequencyAlignmentSpeed) + out.in*frequencyAlignmentSpeed;
-		// phaseDetector.quad= phaseDetector.quad * (1-frequencyAlignmentSpeed) + out.quad*frequencyAlignmentSpeed;
-		// frequencyDetector.in= frequencyDetector.in * (1-frequencyAlignmentSpeed) + previous.in*frequencyAlignmentSpeed;
-		// frequencyDetector.quad= frequencyDetector.quad * (1-frequencyAlignmentSpeed) + previous.quad*frequencyAlignmentSpeed;
 
 		final float staticMismatchPhase = (float) (phaseDetector.phase() * phaseDetector.magnitude());
 		final float frequencyMismatchPhase = (float) frequencyDetector.phase();

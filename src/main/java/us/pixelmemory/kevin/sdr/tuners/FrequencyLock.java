@@ -50,6 +50,8 @@ public final class FrequencyLock implements AnalogTunerLock {
 		previous.conjugate();
 		previous.multiply(out);
 		previous.rotateRight();
+		
+		//FIXME - One dimension averaging doesn't work well.  Use 2D like PhaseLock.
 		frequencyMismatchPhase = (float) previous.phase();
 		dcAccumulator = dcAccumulator * .99f + 0.01f * frequencyMismatchPhase;
 
