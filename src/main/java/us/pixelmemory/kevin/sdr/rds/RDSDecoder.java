@@ -174,7 +174,12 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 */
 	private void acceptBlock(final int word) {
 		switch (offsetBlock) {
-			case A -> blockA = word;
+			case A -> {
+				if ((word & RDS_CRC.possibleErrorFlag) == 0) {
+					//Use last value if there may be an error
+					blockA = word;
+				}
+			}
 			case B -> {
 				blockB = word;
 				versionA = (word & (1 << 11)) == 0; // Need this to decode the next block

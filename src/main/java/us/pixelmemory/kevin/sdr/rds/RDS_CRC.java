@@ -1,7 +1,6 @@
 package us.pixelmemory.kevin.sdr.rds;
 
 public class RDS_CRC {
-	// MSB first
 
 	// From RDS specification
 	private static final int G = 0x5b9; // bits (10 8 7 5 4 3) + 1
@@ -10,7 +9,9 @@ public class RDS_CRC {
 	private static final int syndromeBits = 10;
 	private static final int syndromeMask = (1 << syndromeBits) - 1;
 	private static final int messageBits = 16;
-	private static final int messageMask = (1 << messageBits) - 1;
+
+	public static final int messageMask = (1 << messageBits) - 1;
+	public static final int possibleErrorFlag = 1 << 30;	//The corrected message may have damage if this bit is set.
 
 	private static final int G16[] = { /**/
 			0b00000000000000010110111001, /**/
@@ -89,10 +90,6 @@ public class RDS_CRC {
 		}
 	}
 
-	public static final void main(final String args[]) {
-		System.out.println(extractSyndrome(encode(5, 0b0000000000)));
-	}
-
 	/**
 	 * Fast syndrome extractor from the RDS specification. Syndrome codes are used to indicate the stream position.
 	 * The position indicates which error correction offset to use.
@@ -143,10 +140,10 @@ public class RDS_CRC {
 	 * @return Decoded and corrected (as much as possible) value
 	 */
 	public static int decode(final int encodedMessage, final int offset) {
-		return decodeMessage((encodedMessage >>> syndromeBits) & messageMask, (extractSyndrome(encodedMessage) ^ offset) & syndromeMask);
+		return decodeMessage((encodedMessage >>> syndromeBits) & messageMask, extractSyndrome(encodedMessage ^ offset) & syndromeMask);
 	}
 
-	public static int decodeMessage(int message, int syndrome) {
+	private static int decodeMessage(int message, int syndrome) {
 		/*
 		 * The following coded with help from <a href='https://the-art-of-ecc.com/3_Cyclic_BCH/RBDS.c'>The Art of Error Correcting Coding</a>
 		 * <code>ISBN 0471 49581 6</code>
@@ -168,6 +165,7 @@ public class RDS_CRC {
 				}
 			}
 		}
-		return message;
+
+		return (syndrome == 0) ? message : (message | possibleErrorFlag);
 	}
 }

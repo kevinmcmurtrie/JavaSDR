@@ -35,7 +35,7 @@ public class FoobarMainApp {
 		final String highStereo = "/home/mcmurtri/SDR/SDRconnect_IQ_20250222_232434_99700000HZ.wav";
 		final String punk = "/home/mcmurtri/SDR/SDRconnect_IQ_20250227_225432_90500000HZ.wav"; //Very weak
 		final float audioSampleRate= 32000f;
-		try (SampleReader<IOException> sr = SampleConverters.createPcmSigned16BitLeReader(AudioSystem.getAudioInputStream(new File(needle)), IQGain);
+		try (SampleReader<IOException> sr = SampleConverters.createPcmSigned16BitLeReader(AudioSystem.getAudioInputStream(new File(highStereo)), IQGain);
 				SourceDataLine line= AudioSystem.getSourceDataLine(new AudioFormat(audioSampleRate, 16, 2, true, false))) {
 			
 			line.open();

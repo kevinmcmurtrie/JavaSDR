@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Set;
 
 import us.pixelmemory.kevin.sdr.rds.CharacterTable;
+import us.pixelmemory.kevin.sdr.rds.RDS_CRC;
 
 /*
  * T0A, T0B
@@ -75,6 +76,13 @@ public class T0X implements GroupHandler {
 	}
 
 	private void setCharacters(final int idx, final int d) {
+		if ((d & RDS_CRC.possibleErrorFlag) != 0) {
+			//Hope the idx is OK but don't trust bad characters
+			name[idx * 2] = ' ';
+			name[idx * 2 + 1] = ' ';
+			return;
+		}
+		
 		if (d == 0x0F0F) {
 			charset[idx] = 0;
 		} else if (d == 0x0E0E) {
