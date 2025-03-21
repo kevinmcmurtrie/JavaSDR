@@ -1,6 +1,6 @@
 package us.pixelmemory.kevin.sdr;
 
-public class IQSample {
+public final class IQSample {
 	private static final IQSample ZERO = new IQSample(0, 1);
 
 	public double in; // real, in-phase

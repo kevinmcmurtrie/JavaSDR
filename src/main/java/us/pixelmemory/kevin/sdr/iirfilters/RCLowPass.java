@@ -2,7 +2,7 @@ package us.pixelmemory.kevin.sdr.iirfilters;
 
 import us.pixelmemory.kevin.sdr.FloatFunction;
 
-public class RCLowPass implements FloatFunction<RuntimeException> {
+public final class RCLowPass implements FloatFunction<RuntimeException> {
 	private final double ratio;
 	private double acc = 0d;
 

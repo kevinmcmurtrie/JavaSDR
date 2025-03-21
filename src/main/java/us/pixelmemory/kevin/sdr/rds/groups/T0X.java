@@ -7,14 +7,13 @@ import us.pixelmemory.kevin.sdr.rds.CharacterTable;
 
 /*
  * T0A, T0B
- * 
  * Page 10
  * 1: PI code
  * 2: ....DI C1 C0
  * 3: Alt frequency
  * 4: Character code pair
  * 
- * Dx is reverse index of C1 C0!  00=3, 01=2, 10=1, 11=0
+ * Dx is reverse index of C1 C0! 00=3, 01=2, 10=1, 11=0
  * D0: 0: Mono, 1: Stereo
  * D1: 0: Not, 1: Is artificial head
  * D2: 0: Not, 1: Is compressed
@@ -40,42 +39,42 @@ import us.pixelmemory.kevin.sdr.rds.CharacterTable;
  * 255: Unused
  */
 public class T0X implements GroupHandler {
-	private final char name[]= new char[8];
-	private final int charset[]= new int[4];
+	private final char name[] = new char[8];
+	private final int charset[] = new int[4];
 	private boolean stereo;
-	private boolean artificialHead;	//Undefined
-	private boolean compressed;		//Undefined
-	private boolean dynamicPTY;		//Undefined
-	//Alternate frequency unimplemented
-	
-	public T0X () {
+	private boolean artificialHead; // Undefined
+	private boolean compressed; // Undefined
+	private boolean dynamicPTY; // Undefined
+	// Alternate frequency unimplemented
+
+	public T0X() {
 		reset();
 	}
-	
-	public void reset () {
+
+	public void reset() {
 		Arrays.fill(name, ' ');
-		Arrays.fill(charset, 0); //0 is default
-		stereo= true;
-		artificialHead= false;
-		compressed= false;
-		dynamicPTY= false;
+		Arrays.fill(charset, 0); // 0 is default
+		stereo = true;
+		artificialHead = false;
+		compressed = false;
+		dynamicPTY = false;
 	}
 
 	@SuppressWarnings("incomplete-switch")
 	@Override
-	public void accept(int a, int b, int c, int d) {
-		int idx= b & 3;
-		boolean dcb= ((b >> 2) & 1) != 0;
+	public void accept(final int a, final int b, final int c, final int d) {
+		final int idx = b & 3;
+		final boolean dcb = ((b >> 2) & 1) != 0;
 		switch (idx) {
-			case 0 -> dynamicPTY= dcb;
-			case 1 -> compressed= dcb;
-			case 2 -> artificialHead= dcb;
-			case 3 -> stereo= dcb;
+			case 0 -> dynamicPTY = dcb;
+			case 1 -> compressed = dcb;
+			case 2 -> artificialHead = dcb;
+			case 3 -> stereo = dcb;
 		}
-		setCharacters (idx, d);
+		setCharacters(idx, d);
 	}
-	
-	private void setCharacters (int idx, int d) {
+
+	private void setCharacters(final int idx, final int d) {
 		if (d == 0x0F0F) {
 			charset[idx] = 0;
 		} else if (d == 0x0E0E) {
@@ -87,8 +86,7 @@ public class T0X implements GroupHandler {
 			name[idx * 2 + 1] = CharacterTable.getCharacter(charset[idx], d & 0xFF);
 		}
 	}
-	
-	
+
 	@Override
 	public String toString() {
 		return "T0X [name=" + new String(name).trim() + ", stereo=" + stereo + ", artificialHead=" + artificialHead + ", compressed=" + compressed + ", dynamicPTY=" + dynamicPTY + "]";

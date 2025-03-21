@@ -17,7 +17,7 @@ import us.pixelmemory.kevin.sdr.tuners.TunerLock;
 /**
  * The success rate of binary data extraction sucks.
  */
-public class RDSDecoder implements FloatConsumer<RuntimeException> {
+public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	private static final boolean debugEnable = true;
 	private static final float rdsFrequency = 57000f;
 	private static final float rdsRate = 1187.5f; // This is the data rate. The encoding is double-rate.
@@ -64,7 +64,7 @@ public class RDSDecoder implements FloatConsumer<RuntimeException> {
 		bandpass = new SingleFilterIQ(intermediateFrequency1, new LowPass(LanczosTable.of(64), 1.8f * rdsRate));
 
 		// Step 4. Decode the binary phase shift keying (BPSK) into 0 and 1.
-		pskTuner = new Tuner<>(new PhaseShiftKeyingLock(2, intermediateFrequency1, 0.001d, 0.01, true), sampleRate);
+		pskTuner = new Tuner<>(new PhaseShiftKeyingLock(2, intermediateFrequency1, 0.0005d, 0.01, true), sampleRate);
 
 		// Step 5. Downsample the 0 and 1 stream to debounce edge transitions.
 		secondDownsample = new DownsamplerIdentifier<>(LanczosTable.of(2), intermediateFrequency1, intermediateFrequency2, this::acceptDownsampled);

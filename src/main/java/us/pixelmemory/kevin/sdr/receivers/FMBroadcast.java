@@ -45,7 +45,7 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 
 	public FMBroadcast(final float sampleRate, final FloatPairConsumer<T> stereoOut, final FloatConsumer<T> rdsOut) {
 		deEmphasis = new RCLowPassStereo<>(sampleRate, 0.000060d, stereoOut);
-		pilotTuner = new Tuner<>(new PhaseLock(sampleRate, pilotFrequency, 0.000002d, 0.001, enableDebug), sampleRate, pilotFrequency);
+		pilotTuner = new Tuner<>(new PhaseLock(sampleRate, pilotFrequency, 0.000005d, 0.001, enableDebug), sampleRate, pilotFrequency);
 		multifilter = new MultiFilter<>(sampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3]), stereoPilotFilter, monoBandFilter, stereoBandFilter, rdsBandFilter);
 		pilotStrengthFilter = new RCLowPass(sampleRate, pilotStrengthRc);
 		this.rdsOut = rdsOut;

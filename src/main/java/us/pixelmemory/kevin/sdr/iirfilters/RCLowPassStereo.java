@@ -2,7 +2,7 @@ package us.pixelmemory.kevin.sdr.iirfilters;
 
 import us.pixelmemory.kevin.sdr.FloatPairConsumer;
 
-public class RCLowPassStereo<T extends Throwable> implements FloatPairConsumer<T> {
+public final class RCLowPassStereo<T extends Throwable> implements FloatPairConsumer<T> {
 	private final double ratio;
 	private final FloatPairConsumer<T> out;
 	private double leftAcc = 0d;

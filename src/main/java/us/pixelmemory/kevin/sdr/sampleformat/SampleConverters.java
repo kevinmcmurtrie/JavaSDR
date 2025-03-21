@@ -11,7 +11,7 @@ import us.pixelmemory.kevin.sdr.FloatPairConsumer;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.SimplerMath;
 
-//TODO - refactor this junk drawer
+// TODO - refactor this junk drawer
 public class SampleConverters {
 	private SampleConverters() {
 	}

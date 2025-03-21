@@ -3,7 +3,7 @@ package us.pixelmemory.kevin.sdr.iirfilters;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQSampleProcessor;
 
-public class RCLowPassIQ implements IQSampleProcessor<RuntimeException, Void> {
+public final class RCLowPassIQ implements IQSampleProcessor<RuntimeException, Void> {
 	private final double ratio;
 
 	public RCLowPassIQ(final double sampleRate, final double r, final double c) {

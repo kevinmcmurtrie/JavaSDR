@@ -2,12 +2,9 @@ package us.pixelmemory.kevin.sdr.tuners;
 
 import java.awt.Color;
 
-import us.pixelmemory.kevin.sdr.FloatFunction;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
-import us.pixelmemory.kevin.sdr.SimplerMath;
-import us.pixelmemory.kevin.sdr.firfilters.RunningAverage;
-import us.pixelmemory.kevin.sdr.firfilters.SingleFilter;
+import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 
 /**
  * Decode PSK constellations.
@@ -19,9 +16,11 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 	private final IQVisualizer vis;
 
 	private final IQSample previous = new IQSample();
-	private final double frequencyAlignmentSpeed;
-	private final FloatFunction<RuntimeException> frequencyMismatchFilter;
-	private final FloatFunction<RuntimeException> phaseMismatchFilter;
+	private final IQSample rotatedPoint = new IQSample();
+	private final double samplesPerCycle;
+	private final IQSample phaseDetector = new IQSample();
+	private final IQSample frequencyDetector = new IQSample();
+	private final RCLowPassIQ tuningLowPass;
 	private final int points;
 
 	// Need two AFT rates to dampen cycling (the parallel C and RC in every PLL)
@@ -36,15 +35,14 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		}
 		this.points = points;
 
-		final double samplesPerCycle = sampleRate / frequency;
+		samplesPerCycle = sampleRate / frequency;
 		if (samplesPerCycle < 2) {
 			throw new IllegalArgumentException("sampleRate is too low");
 		}
 		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
-		this.frequencyAlignmentSpeed = aftFractionalSpeed;
 		this.aftLimit = aftPercentLimit / tauCyclesPerSample;
-		frequencyMismatchFilter = (aftLimit != 0) ? new SingleFilter((float) samplesPerCycle, new RunningAverage(200)) : f -> f;
-		phaseMismatchFilter = (aftLimit != 0) ? new SingleFilter((float) samplesPerCycle, new RunningAverage(64)) : f -> f;
+		tuningLowPass = new RCLowPassIQ(1 / aftFractionalSpeed);
+
 		this.debug = debug;
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
 		if (enableDebug && debug) {
@@ -57,15 +55,13 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 			throw new IllegalArgumentException("at least 1 point");
 		}
 		this.points = points;
-
-		this.frequencyAlignmentSpeed = aftFractionalSpeed;
+		samplesPerCycle = sampleRate;
 		this.aftLimit = aftPercentLimit;
-		frequencyMismatchFilter = (aftLimit != 0) ? new SingleFilter(1, new RunningAverage(200)) : f -> f;
-		phaseMismatchFilter = (aftLimit != 0) ? new SingleFilter(1, new RunningAverage(64)) : f -> f;
+		tuningLowPass = new RCLowPassIQ(1 / aftFractionalSpeed);
 		this.debug = debug;
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
 		if (enableDebug && debug) {
-			vis.syncOnColor(Color.pink);
+			vis.syncOnColor(Color.red);
 		}
 	}
 
@@ -76,7 +72,15 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 
 	@Override
 	public double getClockRateAdjustment() {
-		return frequencyAft + phaseAft;
+		return frequencyAft;
+	}
+
+	@Override
+	public double consumeClockRateAdjustment() {
+		final double adj = frequencyAft + phaseAft;
+		phaseDetector.rotate(-phaseAft / 2);
+		phaseAft = 0;
+		return adj;
 	}
 
 	/**
@@ -88,52 +92,57 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 
 	@Override
 	public void accept(final IQSample src, final IQSample out, final double clock) {
+		final float phase = (float) out.phase();
+		value = (int) Math.round((phase / Math.TAU) * points);
+		if (value < 0) {
+			value += points;
+		}
+		rotatedPoint.set(out);
+		rotatedPoint.rotate((value * Math.TAU) / points);
+
 		previous.conjugate();
 		previous.multiply(out);
 		previous.rotateRight();
-		final float frequencyMismatchPhaseRaw = (float) previous.phase();
 
-		final float phase = (float) out.phase();
-		final int point = (int) Math.round((phase / Math.TAU) * points);
-		final float expectedPhase = ((float) Math.TAU / points) * point;
-		final float errorPhase = (float) out.magnitude() * (phase - expectedPhase); // Don't use samples that pass through 0,0 because their phase is noise.
-		final float staticMismatchPhase = phaseMismatchFilter.apply(TunerLock.unwrapPhaseDistance(errorPhase));
-		final float frequencyMismatchPhase = frequencyMismatchFilter.apply(SimplerMath.clamp(frequencyMismatchPhaseRaw, -1f, 1f));
+		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
+		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
 
-		// Magic numbers here. Hand-tweaked for stability.
-		// A small phase error disables the frequency phase error so noise can't kick it off sync.
-		phaseAft = phaseAft * 0.99 + 0.02 * staticMismatchPhase * frequencyAlignmentSpeed;
-		frequencyAft += (phaseAft + Math.abs(phaseAft) * frequencyMismatchPhase) * frequencyAlignmentSpeed;
+		tuningLowPass.accept(rotatedPoint, phaseDetector);
+		tuningLowPass.accept(previous, frequencyDetector);
+
+		final double staticMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
+		final double frequencyMismatchPhase = frequencyDetector.phase() * frequencyDetector.magnitude();
+
+		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
+		phaseAft = frequencyMismatchPhase + staticMismatchPhase;
+
+		// Slower adjustments to the frequency.
+		frequencyAft += phaseAft / samplesPerCycle;
 
 		if (frequencyAft > aftLimit) {
-			System.out.println("AFT limit: " + frequencyAft);
+			if (enableDebug) {
+				System.out.println("AFT limit: " + frequencyAft);
+			}
 			frequencyAft = aftLimit;
 		}
 		if (frequencyAft < -aftLimit) {
-			System.out.println("AFT limit: " + frequencyAft);
+			if (enableDebug) {
+				System.out.println("AFT limit: " + frequencyAft);
+			}
 			frequencyAft = -aftLimit;
 		}
 
-		value = (points / 2 + point) % points;
 		if (enableDebug && debug) {
+			// vis.fadeStrong(); //DEBUG
 			vis.markCenter();
-			// vis.drawIQ(Color.red, src);
-			vis.drawAnalog(Color.red, 6 + src.in);
-			vis.drawAnalog(Color.pink, 4.5 + 2 * value / (float) points);
-
-			vis.drawAnalog(Color.CYAN, 100 * frequencyAft / aftLimit);
+			vis.drawIQ(Color.pink, previous);
+			vis.drawAnalog(Color.red, value);
+			vis.drawAnalog(Color.cyan, 100 * frequencyAft / aftLimit);
 			vis.drawAnalog(Color.orange, 100 * phaseAft / aftLimit);
-			vis.drawIQ(Color.magenta, previous);
+			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.blue, out);
-			vis.drawAnalog(Color.green, errorPhase / Math.PI);
-
-			// try {
-			// vis.repaint();
-			// Thread.sleep(100);
-			// } catch (InterruptedException e) {
-			// // TODO Auto-generated catch block
-			// e.printStackTrace();
-			// }
+			vis.drawIQ(Color.green, phaseDetector);
+			// vis.repaint(); //DEBUG
 		}
 		previous.set(out);
 	}

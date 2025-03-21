@@ -72,11 +72,8 @@ public final class Tuner<LOCK extends TunerLock> implements IQSampleProcessor<Ru
 	 */
 	@Override
 	public LOCK accept(final IQSample src, final IQSample out) {
-		//FIXME - Use new rotate method
-		out.setMoment(clock);
-		out.conjugate();
-		out.multiply(src);
-		out.rotateRight();
+		out.set(src);
+		out.rotate(-clock);
 		lock.accept(src, out, getClock());
 		clockTick();
 		return lock;
