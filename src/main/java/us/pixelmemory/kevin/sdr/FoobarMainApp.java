@@ -1,9 +1,14 @@
 package us.pixelmemory.kevin.sdr;
 
+//import java.io.ByteArrayInputStream;
+//import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+//import java.io.InputStream;
 
+//import javax.sound.sampled.AudioFileFormat.Type;
 import javax.sound.sampled.AudioFormat;
+//import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
@@ -35,17 +40,37 @@ public class FoobarMainApp {
 		final String highStereo = "/home/mcmurtri/SDR/SDRconnect_IQ_20250222_232434_99700000HZ.wav";
 		final String punk = "/home/mcmurtri/SDR/SDRconnect_IQ_20250227_225432_90500000HZ.wav"; //Very weak
 		final float audioSampleRate= 32000f;
-		try (SampleReader<IOException> sr = SampleConverters.createPcmSigned16BitLeReader(AudioSystem.getAudioInputStream(new File(highStereo)), IQGain);
-				SourceDataLine line= AudioSystem.getSourceDataLine(new AudioFormat(audioSampleRate, 16, 2, true, false))) {
+		
+		
+		
+		final String theFile= highStereo;
+		
+		
+//		class BAOS extends ByteArrayOutputStream {
+//			InputStream toInput () {
+//				return new ByteArrayInputStream(buf, 0, count);
+//			}
+//		}
+//		BAOS audioBuffer= new BAOS();
+		
+		AudioFormat outputFormat= new AudioFormat(audioSampleRate, 16, 2, true, false); 
+		
+		try (SampleReader<IOException> sr = SampleConverters.createPcmSigned16BitLeReader(AudioSystem.getAudioInputStream(new File(theFile)), IQGain);
+				SourceDataLine line= AudioSystem.getSourceDataLine(outputFormat)) {
 			
 			line.open();
 			line.start();
+			
+			final ByteArrayConsumer<RuntimeException> out= (byte buffer[], int offset, int length) -> {
+				line.write(buffer, offset, length);
+				//audioBuffer.write(buffer, offset, length);
+			};
 
 			final float rawSampleRate= sr.getSampleRateHz();
 			boolean intermediateResample = rawSampleRate > targetSampleRate;
 			final float sampleRate = intermediateResample ? targetSampleRate : rawSampleRate;
 			
-			DownsamplerStereo<RuntimeException> audioSampler= new DownsamplerStereo<>(LanczosTable.of(3), sampleRate, audioSampleRate, SampleConverters.createPcmSignedStereo16BitLe(line::write));
+			DownsamplerStereo<RuntimeException> audioSampler= new DownsamplerStereo<>(LanczosTable.of(3), sampleRate, audioSampleRate, SampleConverters.createPcmSignedStereo16BitLe(out));
 			RDSDecoder rds= new RDSDecoder (sampleRate);
 			FMBroadcast<RuntimeException> stereo= new FMBroadcast<>(sampleRate, audioSampler, rds);
 			
@@ -66,5 +91,8 @@ public class FoobarMainApp {
 			
 			line.drain();
 		}
+		
+//		AudioInputStream recordingAdaptor= new AudioInputStream(audioBuffer.toInput(), outputFormat, audioBuffer.size());
+//		AudioSystem.write(recordingAdaptor, Type.WAVE, new File(theFile + "to.wav"));
 	}
 }

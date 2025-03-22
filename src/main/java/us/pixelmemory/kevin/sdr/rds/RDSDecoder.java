@@ -18,7 +18,7 @@ import us.pixelmemory.kevin.sdr.tuners.TunerLock;
  * The success rate of binary data extraction sucks.
  */
 public final class RDSDecoder implements FloatConsumer<RuntimeException> {
-	private static final boolean debugEnable = true;
+	private static final boolean debugEnable = false;
 	private static final float rdsFrequency = 57000f;
 	private static final float rdsRate = 1187.5f; // This is the data rate. The encoding is double-rate.
 	private static final float intermediateFrequency1 = rdsRate * 16;

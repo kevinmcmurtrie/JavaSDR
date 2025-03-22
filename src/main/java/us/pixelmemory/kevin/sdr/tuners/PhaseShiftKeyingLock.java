@@ -10,7 +10,7 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
  * Decode PSK constellations.
  */
 public final class PhaseShiftKeyingLock implements TunerLock {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 
 	private final boolean debug;
 	private final IQVisualizer vis;

@@ -13,6 +13,8 @@ import us.pixelmemory.kevin.sdr.SimplerMath;
 
 // TODO - refactor this junk drawer
 public class SampleConverters {
+	private static final boolean debug = false;
+
 	private SampleConverters() {
 	}
 
@@ -32,8 +34,15 @@ public class SampleConverters {
 			public void accept(float f) throws T {
 				if (f > 1f) {
 					f = 1f;
+					if (debug) {
+						System.out.println(f);// DEBUG
+					}
 				} else if (f < -1f) {
 					f = -1f;
+					if (debug) {
+						System.out.println(f);// DEBUG
+
+					}
 				}
 				final int i = Math.round(f * 32767);
 				buffer[0] = (byte) (i & 0xff);
@@ -50,6 +59,13 @@ public class SampleConverters {
 
 			@Override
 			public void accept(final float left, final float right) throws T {
+				if (debug && ((left > 1f) || (left < -1f))) {
+					System.out.println(left);// DEBUG
+				}
+				if (debug && ((right > 1f) || (right < -1f))) {
+					System.out.println(right);// DEBUG
+				}
+
 				final int l = Math.round(SimplerMath.clamp(32767 * left, -32768, 32767));
 				final int r = Math.round(SimplerMath.clamp(32767 * right, -32768, 32767));
 				buffer[pos++] = (byte) (l & 0xff);
