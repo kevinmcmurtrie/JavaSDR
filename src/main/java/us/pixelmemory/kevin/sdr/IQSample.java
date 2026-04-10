@@ -1,7 +1,7 @@
 package us.pixelmemory.kevin.sdr;
 
 public final class IQSample {
-	private static final IQSample ZERO = new IQSample(0, 1);
+	private static final IQSample ZERO_PHASE_1 = new IQSample(0, 1);
 
 	public double in; // real, in-phase
 	public double quad; // Imaginary, quadrature
@@ -11,7 +11,7 @@ public final class IQSample {
 	}
 
 	public IQSample() {
-		set(ZERO);
+		set(ZERO_PHASE_1);
 	}
 
 	public IQSample(final double moment) {

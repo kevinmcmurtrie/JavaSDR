@@ -14,6 +14,7 @@ import us.pixelmemory.kevin.sdr.FloatConsumer;
 public final class MultiFilter<T extends Throwable> implements FloatConsumer<T> {
 	private final FloatArrayConsumer<T> out;
 	private final float circBuf[];
+	private final float extraCircBuf[][];
 	private final float results[];
 	private final FilterFIR filters[];
 	private final float sampleRate;
@@ -53,8 +54,13 @@ public final class MultiFilter<T extends Throwable> implements FloatConsumer<T> 
 
 	@SafeVarargs
 	public MultiFilter(final float sampleRate, final FloatArrayConsumer<T> consumer, final FilterBuilder... filters) {
+		this(sampleRate, consumer, 0, filters);
+	}
+
+	@SafeVarargs
+	public MultiFilter(final float sampleRate, final FloatArrayConsumer<T> consumer, final int extraFields, final FilterBuilder... filters) {
 		this.sampleRate = sampleRate;
-		results = new float[filters.length];
+		results = new float[extraFields + filters.length];
 		out = consumer;
 		this.filters = new FilterFIR[filters.length];
 		int maxDistance = 1;
@@ -64,7 +70,14 @@ public final class MultiFilter<T extends Throwable> implements FloatConsumer<T> 
 		}
 		sampleLatency = maxDistance;
 		circBuf = CircbufBuilder.createMaskableCircularBuffer(1 + 2 * maxDistance);
-
+		if (extraFields > 0) {
+			extraCircBuf = new float[circBuf.length][];
+			for (int i = 0; i < extraCircBuf.length; ++i) {
+				extraCircBuf[i] = new float[extraFields];
+			}
+		} else {
+			extraCircBuf = null;
+		}
 	}
 
 	public float getSampleRate() {
@@ -80,6 +93,24 @@ public final class MultiFilter<T extends Throwable> implements FloatConsumer<T> 
 		for (int filterIdx = 0; filterIdx < filters.length; ++filterIdx) {
 			results[filterIdx] = filters[filterIdx].apply(circBuf, sampleIdx);
 		}
+		out.accept(results);
+	}
+
+	public void accept(final float f, final float... extraFields) throws T {
+		System.arraycopy(extraFields, 0, extraCircBuf[pos], 0, extraFields.length);
+		circBuf[pos] = f;
+
+		final int sampleIdx = (pos - sampleLatency) & (circBuf.length - 1);
+		pos = (pos + 1) & (circBuf.length - 1);
+		for (int filterIdx = 0; filterIdx < filters.length; ++filterIdx) {
+			results[filterIdx] = filters[filterIdx].apply(circBuf, sampleIdx);
+		}
+
+		final float[] extras = extraCircBuf[sampleIdx];
+		if (extras != null) {
+			System.arraycopy(extras, 0, results, filters.length, extras.length);
+		}
+
 		out.accept(results);
 	}
 

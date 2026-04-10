@@ -23,6 +23,7 @@ import us.pixelmemory.kevin.sdr.resamplers.DownsamplerStereo;
 import us.pixelmemory.kevin.sdr.sampleformat.SampleConverters;
 import us.pixelmemory.kevin.sdr.sampleformat.SampleConverters.SampleReader;
 import us.pixelmemory.kevin.sdr.tuners.FrequencyLock;
+import us.pixelmemory.kevin.sdr.tuners.PhaseTunerLock;
 import us.pixelmemory.kevin.sdr.tuners.Tuner;
 
 public class FoobarMainApp {
@@ -39,11 +40,12 @@ public class FoobarMainApp {
 		final String needle= "/home/mcmurtri/SDR/SDRconnect_IQ_20250222_232117_97300000HZ.wav"; //fast
 		final String highStereo = "/home/mcmurtri/SDR/SDRconnect_IQ_20250222_232434_99700000HZ.wav";
 		final String punk = "/home/mcmurtri/SDR/SDRconnect_IQ_20250227_225432_90500000HZ.wav"; //Very weak
+				
 		final float audioSampleRate= 32000f;
 		
 		
 		
-		final String theFile= highStereo;
+		final String theFile= music;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {
@@ -74,11 +76,11 @@ public class FoobarMainApp {
 			RDSDecoder rds= new RDSDecoder (sampleRate);
 			FMBroadcast<RuntimeException> stereo= new FMBroadcast<>(sampleRate, audioSampler, rds);
 			
-			Tuner<FrequencyLock> aft= new Tuner<>(new FrequencyLock(0.000005d, 2d, false), sampleRate);
+			Tuner<PhaseTunerLock> aft= new Tuner<>(new FrequencyLock(sampleRate, 10, 1000d, false), sampleRate);
 
 			IQSample tuned = new IQSample();
 			final float gain= sampleRate/(2*targetSampleRate);
-			IQSampleConsumer<RuntimeException> fmDemod = iq -> stereo.accept(aft.accept(iq, tuned).getValue()*gain);
+			IQSampleConsumer<RuntimeException> fmDemod = iq -> stereo.accept(aft.accept(iq, tuned).getPhase()*gain);
 			
 			//FIXME: Thread leak
 			IQSampleConsumer<RuntimeException> sink= intermediateResample ? new DownsamplerIQ<>(LanczosTable.of(3), rawSampleRate, sampleRate, new IQSampleBufferThread<>(2048, "First DS", fmDemod)) : fmDemod;

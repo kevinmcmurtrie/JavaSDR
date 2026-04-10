@@ -13,7 +13,7 @@ import us.pixelmemory.kevin.sdr.SimplerMath;
 
 // TODO - refactor this junk drawer
 public class SampleConverters {
-	private static final boolean debug = false;
+	private static final boolean debug = true;
 
 	private SampleConverters() {
 	}

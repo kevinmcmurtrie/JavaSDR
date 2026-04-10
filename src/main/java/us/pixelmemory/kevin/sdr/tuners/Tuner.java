@@ -5,27 +5,17 @@ import us.pixelmemory.kevin.sdr.IQSampleProcessor;
 
 public final class Tuner<LOCK extends TunerLock> implements IQSampleProcessor<RuntimeException, LOCK> {
 	private final LOCK lock;
-	private final double tauCyclesPerSample;
 	private final double sampleRate;
 	private final double frequency;
 
-	private double clock = 0.0d;
+	private Clock clock;
 	private IQFaker faker = null;
 
-	/**
-	 * @param samplesPerCycle
-	 * @param aftFractionalSpeed Phase error applied to aft
-	 * @param aftLimit Maximum percent phase per each sample (should be small)
-	 */
 	public Tuner(final LOCK lock, final double sampleRate, final double frequency) {
 		this.lock = lock;
 		this.sampleRate = sampleRate;
 		this.frequency = frequency;
-		final double samplesPerCycle = sampleRate / frequency;
-		if (Math.abs(samplesPerCycle) <= 2) {
-			throw new IllegalArgumentException("sampleRate is too low");
-		}
-		this.tauCyclesPerSample = Math.TAU / samplesPerCycle;
+		clock= new Clock(sampleRate, frequency);
 	}
 
 	// De-drift tuning.
@@ -33,7 +23,7 @@ public final class Tuner<LOCK extends TunerLock> implements IQSampleProcessor<Ru
 		this.lock = lock;
 		this.sampleRate = sampleRate;
 		frequency = 0;
-		this.tauCyclesPerSample = 0;
+		clock= new Clock(sampleRate, 0);
 	}
 
 	public double getSampleRate() {
@@ -48,22 +38,13 @@ public final class Tuner<LOCK extends TunerLock> implements IQSampleProcessor<Ru
 	 * @return -Math.PI .. Math.PI as sawtooth /|/|/|
 	 */
 	public double getClock() {
-		return clock;
+		return clock.getClock();
 	}
 
 	public double getClockRate() {
-		return tauCyclesPerSample + lock.getClockRateAdjustment();
+		return clock.tauPerSample + lock.getClockRateAdjustment();
 	}
 
-	private void clockTick() {
-		clock += tauCyclesPerSample + lock.consumeClockRateAdjustment();
-		if (clock > Math.PI) {
-			clock -= Math.TAU;
-		}
-		if (clock < -Math.PI) {
-			clock += Math.TAU;
-		}
-	}
 
 	/**
 	 * @param src Input sample
@@ -73,9 +54,9 @@ public final class Tuner<LOCK extends TunerLock> implements IQSampleProcessor<Ru
 	@Override
 	public LOCK accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		out.rotate(-clock);
-		lock.accept(src, out, getClock());
-		clockTick();
+		final double c= clock.getAndTick(lock.consumeClockRateAdjustment());
+		out.rotate(-c);
+		lock.accept(src, out, c);
 		return lock;
 	}
 
@@ -100,6 +81,7 @@ public final class Tuner<LOCK extends TunerLock> implements IQSampleProcessor<Ru
 		return accept(faker.fakeIQ(src), out);
 	}
 
+	//This has to be used before the clock tick consumes a rate adjustment
 	private final class IQFaker {
 		@FunctionalInterface
 		interface Clock {

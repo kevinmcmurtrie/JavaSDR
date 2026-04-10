@@ -17,6 +17,10 @@ public final class RCLowPass implements FloatFunction<RuntimeException> {
 	public RCLowPass(final double ratio) {
 		this.ratio = ratio;
 	}
+	
+	public void setValue (double value) {
+		acc= value;
+	}
 
 	@Override
 	public float apply(final float f) throws RuntimeException {
