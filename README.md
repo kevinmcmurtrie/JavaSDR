@@ -7,4 +7,4 @@ Broadcast FM Stereo is working except for maybe audio level compensation.
 RDS, which would be critical for a media device, is a lousy work in progress.
 AM, narrow band FM, SDR interfacing, and tuning multiple stations from wideband sampling are TODO.
 
-Hey, SDRPlay.  Document the damn network API for your nRSP-ST.
+Hey, SDRPlay.  Document the damn API for your nRSP-ST.  My project needs your $$$ SDR working.
