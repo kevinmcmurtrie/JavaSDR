@@ -3,7 +3,7 @@ package us.pixelmemory.kevin.sdr.iirfilters;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQSampleProcessor;
 
-public final class RCLowPassIQ implements IQSampleProcessor<RuntimeException, Void> {
+public final class RCLowPassIQ implements IQSampleProcessor<RuntimeException> {
 	private final double ratio;
 
 	public RCLowPassIQ(final double sampleRate, final double r, final double c) {
@@ -19,9 +19,8 @@ public final class RCLowPassIQ implements IQSampleProcessor<RuntimeException, Vo
 	}
 
 	@Override
-	public Void accept(final IQSample in, final IQSample out) throws RuntimeException {
+	public void accept(final IQSample in, final IQSample out) throws RuntimeException {
 		out.in += (in.in - out.in) / ratio;
 		out.quad += (in.quad - out.quad) / ratio;
-		return null;
 	}
 }

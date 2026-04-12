@@ -33,7 +33,6 @@ import us.pixelmemory.kevin.sdr.sampleformat.MonoToStereo;
 import us.pixelmemory.kevin.sdr.sampleformat.SampleConverters;
 import us.pixelmemory.kevin.sdr.sampleformat.SampleConverters.SampleReader;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
-import us.pixelmemory.kevin.sdr.tuners.Tuner;
 
 public class FoobarMainAM {
 	private static final boolean enableDebug = true;
@@ -80,7 +79,7 @@ public class FoobarMainAM {
 			RCLowPass basicStrengthFilter = new RCLowPass(sampleRate, carrierStrengthRc);
 			basicStrengthFilter.setValue(1);
 			
-			Tuner<PhaseLock> aft= new Tuner<>(new PhaseLock(sampleRate, 0.5, 1000d, true), sampleRate);
+			PhaseLock aft= new PhaseLock(sampleRate, 0.5, 1000d, true);
 			IQSample tuned = new IQSample();
 			SingleAlphaFilter audioPass= new SingleAlphaFilter(sampleRate, new LowPassAlpha(LanczosTable.of(10), 4300));
 			IQSample t2 = new IQSample();

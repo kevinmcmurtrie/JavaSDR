@@ -1,6 +1,6 @@
 package us.pixelmemory.kevin.sdr.tuners;
 
 public interface PhaseTunerLock extends TunerLock {
-	float getClock();
+	double getClock();
 	float getPhase();
 }

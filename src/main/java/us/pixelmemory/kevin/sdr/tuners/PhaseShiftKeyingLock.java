@@ -22,6 +22,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 	private final IQSample frequencyDetector = new IQSample();
 	private final RCLowPassIQ tuningLowPass;
 	private final int points;
+	private final Clock clock;
 
 	// Need two AFT rates to dampen cycling (the parallel C and RC in every PLL)
 	private final double aftLimit;
@@ -33,6 +34,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		if (points < 1) {
 			throw new IllegalArgumentException("at least 1 point");
 		}
+		clock= new Clock(sampleRate, frequency);
 		this.points = points;
 
 		samplesPerCycle = sampleRate / frequency;
@@ -54,6 +56,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		if (points < 1) {
 			throw new IllegalArgumentException("at least 1 point");
 		}
+		clock= new Clock(sampleRate);
 		this.points = points;
 		samplesPerCycle = sampleRate;
 		this.aftLimit = aftPercentLimit;
@@ -65,18 +68,13 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		}
 	}
 
-	@Override
-	public double getAFTLimit() {
-		return aftLimit;
-	}
 
 	@Override
 	public double getClockRateAdjustment() {
 		return frequencyAft;
 	}
 
-	@Override
-	public double consumeClockRateAdjustment() {
+	private double consumeClockRateAdjustment() {
 		final double adj = frequencyAft + phaseAft;
 		phaseDetector.rotate(-phaseAft / 2);
 		phaseAft = 0;
@@ -91,7 +89,11 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 	}
 
 	@Override
-	public void accept(final IQSample src, final IQSample out, final double clock) {
+	public void accept(final IQSample src, final IQSample out) {
+		out.set(src);
+		final double c= clock.getAndTick(consumeClockRateAdjustment());
+		out.rotate(-c);
+		
 		final float phase = (float) out.phase();
 		value = (int) Math.round((phase / Math.TAU) * points);
 		if (value < 0) {

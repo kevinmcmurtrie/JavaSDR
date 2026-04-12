@@ -3,7 +3,7 @@ package us.pixelmemory.kevin.sdr.firfilters;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQSampleProcessor;
 
-public final class SingleFilterIQ implements IQSampleProcessor<RuntimeException, Void> {
+public final class SingleFilterIQ implements IQSampleProcessor<RuntimeException> {
 	private final float circBufI[];
 	private final float circBufQ[];
 	private final FilterFIR filter;
@@ -18,13 +18,12 @@ public final class SingleFilterIQ implements IQSampleProcessor<RuntimeException,
 	}
 
 	@Override
-	public Void accept(final IQSample in, final IQSample out) throws RuntimeException {
+	public void accept(final IQSample in, final IQSample out) throws RuntimeException {
 		circBufI[pos] = (float) in.in;
 		circBufQ[pos] = (float) in.quad;
 		final int sampleIdx = (pos - sampleLatency) & (circBufI.length - 1);
 		out.set(filter.apply(circBufI, sampleIdx), filter.apply(circBufQ, sampleIdx));
 		pos = (pos + 1) & (circBufI.length - 1);
-		return null;
 	}
 
 }

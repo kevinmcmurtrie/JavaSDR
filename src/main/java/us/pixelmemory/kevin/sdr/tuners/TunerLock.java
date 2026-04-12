@@ -3,35 +3,16 @@ package us.pixelmemory.kevin.sdr.tuners;
 import java.awt.Color;
 
 import us.pixelmemory.kevin.sdr.IQSample;
+import us.pixelmemory.kevin.sdr.IQSampleProcessor;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
 
-public interface TunerLock {
-	/**
-	 * Informational. Get the AFT limit of this tuner lock.
-	 *
-	 * @return Value specific to this lock
-	 */
-	double getAFTLimit();
-
-	/**
-	 * Get and consume the sin/cos clock rate per sample adjustment.
-	 * An implementation may return a one-time value that is consumed to
-	 * perform phase flipping.
-	 *
-	 * @return sin/cos per sample adjustment
-	 */
-	default double consumeClockRateAdjustment() {
-		return getClockRateAdjustment();
-	}
-
+public interface TunerLock extends IQSampleProcessor<RuntimeException>{
 	/**
 	 * Informational. Get the sin/cos clock rate per sample adjustment.
 	 *
 	 * @return sin/cos per sample adjustment
 	 */
 	double getClockRateAdjustment();
-
-	void accept(IQSample src, IQSample out, double clock);
 
 	static double unwrapPhaseDistance(final double d) {
 		if (d > Math.PI) {
@@ -53,17 +34,13 @@ public interface TunerLock {
 		return d;
 	}
 
-	static TunerLock getNoLock(final boolean debug) {
+	static TunerLock getNoLock(final double sampleRate, final double frequency, final boolean debug) {
+		final Clock clock= new Clock(sampleRate, frequency);
 		if (debug) {
 			final IQVisualizer vis = new IQVisualizer();
-			final IQSample clockIQ = new IQSample();
-			vis.syncOnColor(Color.green);
+			vis.syncOnColor(Color.blue);
 
 			return new TunerLock() {
-				@Override
-				public double getAFTLimit() {
-					return 0;
-				}
 
 				@Override
 				public double getClockRateAdjustment() {
@@ -71,27 +48,24 @@ public interface TunerLock {
 				}
 
 				@Override
-				public void accept(final IQSample src, final IQSample out, final double clock) {
-					clockIQ.setMoment(clock);
-					vis.drawIQ(Color.green, clockIQ);
-					vis.drawIQ(Color.red, src);
+				public void accept(IQSample in, IQSample out) {
+					out.set(in);
+					out.rotate(-clock.getAndTick());
+					vis.drawIQ(Color.red, in);
 					vis.drawIQ(Color.blue, out);
 				}
 			};
 		} else {
 			return new TunerLock() {
 				@Override
-				public double getAFTLimit() {
-					return 0;
-				}
-
-				@Override
 				public double getClockRateAdjustment() {
 					return 0;
 				}
 
 				@Override
-				public void accept(final IQSample src, final IQSample out, final double clock) {
+				public void accept(IQSample in, IQSample out) {
+					out.set(in);
+					out.rotate(-clock.getAndTick());
 				}
 			};
 		}

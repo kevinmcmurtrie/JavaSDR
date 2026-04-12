@@ -19,7 +19,7 @@ public class PhaseLock implements PhaseTunerLock {
 	private final double aftLimit;
 	private double frequencyAft = 0;
 	private double phaseAft = 0;
-	private float clock = 0;
+	private final Clock clock;
 	private float phaseOffset;
 
 	private final RCLowPassIQ errorLowPass;
@@ -28,6 +28,7 @@ public class PhaseLock implements PhaseTunerLock {
 	private final IQSample frequencyDetector = new IQSample();
 
 	public PhaseLock(final double sampleRate, final double frequency, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
+		clock= new Clock(sampleRate, frequency);
 		samplesPerCycle = sampleRate / frequency;
 		if (samplesPerCycle < 2) {
 			throw new IllegalArgumentException("sampleRate is too low");
@@ -43,6 +44,7 @@ public class PhaseLock implements PhaseTunerLock {
 	}
 
 	public PhaseLock(final double sampleRate, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
+		clock= new Clock(sampleRate, 0);
 		samplesPerCycle = 1;
 		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
 		this.aftLimit = frequencyLimit / tauCyclesPerSample;
@@ -55,17 +57,11 @@ public class PhaseLock implements PhaseTunerLock {
 	}
 
 	@Override
-	public double getAFTLimit() {
-		return aftLimit;
-	}
-
-	@Override
 	public double getClockRateAdjustment() {
 		return frequencyAft;
 	}
 
-	@Override
-	public double consumeClockRateAdjustment() {
+	private double consumeClockRateAdjustment() {
 		final double value = frequencyAft + phaseAft;
 		phaseDetector.rotate(0.1 * -phaseAft); // Debounce
 		phaseAft = 0;
@@ -73,7 +69,11 @@ public class PhaseLock implements PhaseTunerLock {
 	}
 
 	@Override
-	public void accept(final IQSample src, final IQSample out, final double clock) {
+	public void accept(final IQSample src, final IQSample out) {
+		out.set(src);
+		final double c= clock.getAndTick(consumeClockRateAdjustment());
+		out.rotate(-c);
+		
 		previous.conjugate();
 		previous.multiply(out);
 		previous.rotateRight();
@@ -124,17 +124,16 @@ public class PhaseLock implements PhaseTunerLock {
 			// vis.repaint();// only interactive debugging
 		}
 		previous.set(out);
-
-		this.clock = (float) clock;
 	}
 
 	@Override
-	public float getClock() {
-		return clock;
+	public double getClock() {
+		return clock.getClock();
 	}
 
 	@Override
 	public float getPhase() {
 		return phaseOffset;
 	}
+
 }

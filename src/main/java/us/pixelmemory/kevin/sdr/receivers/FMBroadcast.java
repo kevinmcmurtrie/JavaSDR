@@ -13,10 +13,10 @@ import us.pixelmemory.kevin.sdr.firfilters.IdentityPass;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.MultiFilter;
+import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassStereo;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
-import us.pixelmemory.kevin.sdr.tuners.Tuner;
 
 public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 	private static final boolean enableDebug = false;
@@ -25,7 +25,8 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 
 	private final float pilotStrengthRc = 1f;
 
-	private final Tuner<PhaseLock> pilotTuner;
+	private final PhaseLock pilotTuner;
+	private final IQSample pilotLockedIQ = new IQSample();
 	private final IQSample pilotIQ = new IQSample();
 	private final MultiFilter<T> multifilter;
 	private final FloatConsumer<T> rdsOut;
@@ -40,42 +41,43 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 	 * Carrier suppressed AM at pilot * 2
 	 */
 	
-	private static final float pilot= 19000f;
-	private static final float stereoSuppressedCarrier= pilot*2f;
+	private static final float stereoSuppressedCarrier= pilotFrequency*2f;
 	private static final float bandwidth= 16000f;
 	private static final float extraStereoGain= 1.5f;
 	
-	private static final FilterBuilder stereoPilotFilter = new BandPass(LanczosTable.of(6), pilot-500f, pilot+500f);
+	private static final FilterBuilder stereoPilotFilter = new BandPass(LanczosTable.of(6), pilotFrequency-500f, pilotFrequency+500f);
 	private static final FilterBuilder monoBandFilter = new LowPass(LanczosTable.of(3), bandwidth);
 	private static final FilterBuilder stereoBandFilter = new BandPass(LanczosTable.of(3), stereoSuppressedCarrier-bandwidth, stereoSuppressedCarrier+bandwidth);
-	private static final FilterBuilder stereoLowerBandFilter = new BandPass(LanczosTable.of(3), stereoSuppressedCarrier-bandwidth, stereoSuppressedCarrier);
 	private static final FilterBuilder rdsBandFilter = new IdentityPass();// RDS has its own filter
 
 	private final RCLowPass pilotStrengthFilter;
 	private final RCLowPassStereo<T> deEmphasis;
+	private final TimeShiftToQuadrature pilotQuad;
 	private final IQVisualizer vis = enableDebug ? new IQVisualizer(2f) : null;
 
 	public FMBroadcast(final float sampleRate, final FloatPairConsumer<T> stereoOut, final FloatConsumer<T> rdsOut) {
 		deEmphasis = new RCLowPassStereo<>(sampleRate, 0.000075d, stereoOut);
-		pilotTuner = new Tuner<>(new PhaseLock(sampleRate, pilotFrequency, 0.1, 100d, enableDebug), sampleRate, pilotFrequency);
-		multifilter = new MultiFilter<>(sampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3], f[4]), stereoPilotFilter, monoBandFilter, stereoBandFilter, stereoLowerBandFilter, rdsBandFilter);
+		pilotTuner = new PhaseLock(sampleRate, pilotFrequency, 0.1, 100d, enableDebug);
+		multifilter = new MultiFilter<>(sampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3]), stereoPilotFilter, monoBandFilter, stereoBandFilter, rdsBandFilter);
 		pilotStrengthFilter = new RCLowPass(sampleRate, pilotStrengthRc);
+		pilotQuad= new TimeShiftToQuadrature(sampleRate, pilotFrequency);
 		this.rdsOut = rdsOut;
-		gain= sampleRate/280000;
+		gain= sampleRate/360000;
 		if (enableDebug) {
 			vis.syncOnColor(Color.gray);
 		}
 	}
 
-	private void bandpassIn(final float pilot, final float monoBand, final float stereoBand, final float stereoLowerBand, final float rdsBand) throws T {
-		final float pllClock = pilotTuner.accept(12 * pilot, pilotFrequency, pilotIQ).getClock();
+	private void bandpassIn(final float pilot, final float monoBand, final float stereoBand, final float rdsBand) throws T {
+		pilotQuad.convert(12 * pilot, pilotIQ);
+		pilotTuner.accept(pilotIQ, pilotLockedIQ);
+		final double pllClock = pilotTuner.getClock();
 		// The tuned pilot should be positive in the quadrature and zero in the in-phase.
 		// Calculate the strength of the stereo and scale it gradually. It will naturally fade in and out on weak signals.
-		final float pilotStrength = pilotStrengthFilter.apply((float) (5 * pilotIQ.quad - 2 * Math.abs(pilotIQ.in)));
+		final float pilotStrength = pilotStrengthFilter.apply((float) (5 * pilotLockedIQ.quad - 2 * Math.abs(pilotLockedIQ.in)));
 		final float stereoStrength = SimplerMath.clamp(pilotStrength - 0.1f, 0, 1);
 		final float doubleClock = (float) Math.sin(2 * pllClock);
 		final float stereo= stereoStrength * extraStereoGain * stereoBand * doubleClock; // L-R
-		final float stereoLow= 1.5f * stereoStrength * extraStereoGain * stereoLowerBand * doubleClock; // L-R
 
 		if (rdsOut != null) {
 			// It would be nice to use the 3*pilot to demodulate RDS, but stations violate the requirement that it be in sync.
@@ -89,13 +91,9 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 			vis.drawAnalog(Color.red, pilotStrength);
 			vis.drawAnalog(Color.blue, 2 + monoBand);
 			vis.drawAnalog(Color.cyan, 3 + stereo);
-			
-			vis.drawAnalog(Color.orange, 3 + stereoLow);
 		}
 
-		deEmphasis.accept(stereo, stereoLow);
-		
-		//deEmphasis.accept(monoBand + stereo, monoBand - stereo);
+		deEmphasis.accept(monoBand + stereo, monoBand - stereo);
 	}
 
 	@Override

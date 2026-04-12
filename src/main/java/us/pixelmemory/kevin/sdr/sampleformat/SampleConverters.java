@@ -35,12 +35,12 @@ public class SampleConverters {
 				if (f > 1f) {
 					f = 1f;
 					if (debug) {
-						System.out.println(f);// DEBUG
+						System.out.println("Clip: " + f);// DEBUG
 					}
 				} else if (f < -1f) {
 					f = -1f;
 					if (debug) {
-						System.out.println(f);// DEBUG
+						System.out.println("Clip: " + f);// DEBUG
 
 					}
 				}
@@ -60,10 +60,10 @@ public class SampleConverters {
 			@Override
 			public void accept(final float left, final float right) throws T {
 				if (debug && ((left > 1f) || (left < -1f))) {
-					System.out.println(left);// DEBUG
+					System.out.println("Clip: " + left);// DEBUG
 				}
 				if (debug && ((right > 1f) || (right < -1f))) {
-					System.out.println(right);// DEBUG
+					System.out.println("Clip: " + right);// DEBUG
 				}
 
 				final int l = Math.round(SimplerMath.clamp(32767 * left, -32768, 32767));

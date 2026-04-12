@@ -18,7 +18,7 @@ public class FrequencyLock implements PhaseTunerLock {
 	// Need two AFT rates to dampen cycling (the parallel C and RC in every PLL)
 	private final double aftLimit;
 	private double frequencyAft = 0;
-	private float clock = 0;
+	private final Clock clock;
 	private float phaseOffset;
 
 	private final RCLowPassIQ frequencyErrorLowPass;
@@ -26,6 +26,7 @@ public class FrequencyLock implements PhaseTunerLock {
 	private final IQSample frequencyDetector = new IQSample();
 
 	public FrequencyLock(final double sampleRate, final double frequency, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
+		clock= new Clock(sampleRate, frequency);
 		samplesPerCycle = sampleRate / frequency;
 		if (samplesPerCycle < 2) {
 			throw new IllegalArgumentException("sampleRate is too low");
@@ -41,6 +42,7 @@ public class FrequencyLock implements PhaseTunerLock {
 	}
 
 	public FrequencyLock(final double sampleRate, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
+		clock= new Clock(sampleRate, 0);
 		samplesPerCycle = 1;
 		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
 		this.aftLimit = frequencyLimit / tauCyclesPerSample;
@@ -53,21 +55,20 @@ public class FrequencyLock implements PhaseTunerLock {
 	}
 
 	@Override
-	public double getAFTLimit() {
-		return aftLimit;
-	}
-
-	@Override
 	public double getClockRateAdjustment() {
 		return frequencyAft;
 	}
 
 	@Override
-	public void accept(final IQSample src, final IQSample out, final double clock) {
+	public void accept(final IQSample src, final IQSample out) {
+		out.set(src);
+		final double c= clock.getAndTick(frequencyAft);
+		out.rotate(-c);
+		
 		previous.conjugate();
 		previous.multiply(out);
 		previous.rotateRight();
-		phaseOffset = (float) previous.phase();
+		phaseOffset = (float)previous.phase();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
@@ -106,13 +107,11 @@ public class FrequencyLock implements PhaseTunerLock {
 			// vis.repaint();// only interactive debugging
 		}
 		previous.set(out);
-
-		this.clock = (float) clock;
 	}
 
 	@Override
-	public float getClock() {
-		return clock;
+	public double getClock() {
+		return clock.getClock();
 	}
 
 	@Override

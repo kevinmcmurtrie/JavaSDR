@@ -8,10 +8,10 @@ import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.SingleFilterIQ;
+import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIdentifier;
 import us.pixelmemory.kevin.sdr.tuners.PhaseShiftKeyingLock;
-import us.pixelmemory.kevin.sdr.tuners.Tuner;
 import us.pixelmemory.kevin.sdr.tuners.TunerLock;
 
 /**
@@ -27,15 +27,17 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	private static final float inputGain = 20f;
 	private final DownsamplerIdentifier<RuntimeException> secondDownsample;
 
-	private final Tuner<?> frequencyShiftTuner;
+	private final TunerLock frequencyShiftTuner;
+	private final IQSample signalToIQ = new IQSample();
 	private final IQSample frequencyShiftIQ = new IQSample();
 
 	private final DownsamplerIQ<RuntimeException> firstDownsample;
 	private final SingleFilterIQ bandpass;
-	private final Tuner<PhaseShiftKeyingLock> pskTuner;
+	private final PhaseShiftKeyingLock pskTuner;
 	private final IQSample bandpassIQ = new IQSample();
 	private final IQSample tunerIQ = new IQSample();
 	private final DifferentialManchesterDecoder<RuntimeException> diffManchesterDecoder;
+	private final TimeShiftToQuadrature toQuadrature;
 
 	private int register = 0; // 26 bits, 16 data + 10 CRC
 	private int registerSize = 0;
@@ -55,7 +57,8 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 
 	public RDSDecoder(final float sampleRate) {
 		// Step 1. Shift 57kHz +/- 2kHz to 0Hz +/- 2KHz. There's no phase lock yet.
-		frequencyShiftTuner = new Tuner<>(TunerLock.getNoLock(false), sampleRate, rdsFrequency); // 57kHz -> 0Hz
+		toQuadrature= new TimeShiftToQuadrature(sampleRate, rdsFrequency);
+		frequencyShiftTuner = TunerLock.getNoLock(sampleRate, rdsFrequency, false); // 57kHz -> 0Hz
 
 		// Step 2. Downsample to the first intermediate frequency.
 		firstDownsample = new DownsamplerIQ<>(LanczosTable.of(3), sampleRate, intermediateFrequency1, this::acceptIntermediateFrequency);
@@ -64,7 +67,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 		bandpass = new SingleFilterIQ(intermediateFrequency1, new LowPass(LanczosTable.of(64), 1.8f * rdsRate));
 
 		// Step 4. Decode the binary phase shift keying (BPSK) into 0 and 1.
-		pskTuner = new Tuner<>(new PhaseShiftKeyingLock(2, intermediateFrequency1, 0.0005d, 0.01, true), sampleRate);
+		pskTuner = new PhaseShiftKeyingLock(2, intermediateFrequency1, 0.0005d, 0.01, true);
 
 		// Step 5. Downsample the 0 and 1 stream to debounce edge transitions.
 		secondDownsample = new DownsamplerIdentifier<>(LanczosTable.of(2), intermediateFrequency1, intermediateFrequency2, this::acceptDownsampled);
@@ -86,7 +89,8 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	public void accept(final float f) {
 		// This isn't quite legit because it's going to fake the quadrature phase from a phase shift signal.
 		// A high sample rate helps make the phase shift signal smaller.
-		frequencyShiftTuner.accept(f * inputGain, frequencyShiftIQ);
+		toQuadrature.convert(f * inputGain, signalToIQ);
+		frequencyShiftTuner.accept(signalToIQ, frequencyShiftIQ);
 		firstDownsample.accept(frequencyShiftIQ);
 	}
 
@@ -98,7 +102,8 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 */
 	void acceptIntermediateFrequency(final IQSample iq) {
 		bandpass.accept(iq, bandpassIQ);
-		secondDownsample.accept(pskTuner.accept(bandpassIQ, tunerIQ).getValue());
+		pskTuner.accept(bandpassIQ, tunerIQ);
+		secondDownsample.accept(pskTuner.getValue());
 	}
 
 	/**
