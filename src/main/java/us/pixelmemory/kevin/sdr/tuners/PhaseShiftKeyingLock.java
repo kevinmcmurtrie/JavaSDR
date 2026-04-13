@@ -8,6 +8,8 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 
 /**
  * Decode PSK constellations.
+ * 
+ * FIXME - broken after refactoring.  Phase correction is trashed.
  */
 public final class PhaseShiftKeyingLock implements TunerLock {
 	private static final boolean enableDebug = false;

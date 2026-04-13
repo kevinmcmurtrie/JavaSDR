@@ -8,9 +8,7 @@ import us.pixelmemory.kevin.sdr.IQVisualizer;
 
 public interface TunerLock extends IQSampleProcessor<RuntimeException>{
 	/**
-	 * Informational. Get the sin/cos clock rate per sample adjustment.
-	 *
-	 * @return sin/cos per sample adjustment
+	 * @return Hz clock adjustment
 	 */
 	double getClockRateAdjustment();
 

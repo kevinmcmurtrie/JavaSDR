@@ -18,6 +18,9 @@ public final class RCLowPassIQ implements IQSampleProcessor<RuntimeException> {
 		this.ratio = ratio;
 	}
 
+	/**
+	 * Merge in to out as an RC low pass.
+	 */
 	@Override
 	public void accept(final IQSample in, final IQSample out) throws RuntimeException {
 		out.in += (in.in - out.in) / ratio;

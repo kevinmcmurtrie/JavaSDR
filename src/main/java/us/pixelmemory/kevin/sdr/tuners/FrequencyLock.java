@@ -70,16 +70,12 @@ public class FrequencyLock implements PhaseTunerLock {
 		previous.rotateRight();
 		phaseOffset = (float)previous.phase();
 
-		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
-		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
 		frequencyErrorLowPass.accept(previous, frequencyDetector);
 
 		final double frequencyMismatchPhase = frequencyDetector.phase() * frequencyDetector.magnitude();
 
-		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
-
 		// Very slow adjustments to the frequency. This one is extremely delicate.
-		frequencyAft += 0.0002f * frequencyMismatchPhase / samplesPerCycle;
+		frequencyAft += 0.0002f * frequencyMismatchPhase * clock.tauPerSample;
 
 		if (frequencyAft > aftLimit) {
 			if (enableDebug) {

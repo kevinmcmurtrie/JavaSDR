@@ -7,16 +7,17 @@ import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 
 public class PhaseLock implements PhaseTunerLock {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 	private final boolean debug;
 	private final IQVisualizer vis;
 
 	// Previous - current is the frequency offset
 	private final IQSample previous = new IQSample();
-	private final double samplesPerCycle;
 
 	// Need two AFT rates to dampen cycling (the parallel C and RC in every PLL)
 	private final double aftLimit;
+	private final double tauCyclesPerSample;
+
 	private double frequencyAft = 0;
 	private double phaseAft = 0;
 	private final Clock clock;
@@ -29,11 +30,11 @@ public class PhaseLock implements PhaseTunerLock {
 
 	public PhaseLock(final double sampleRate, final double frequency, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
 		clock= new Clock(sampleRate, frequency);
-		samplesPerCycle = sampleRate / frequency;
+		double samplesPerCycle = sampleRate / frequency;
 		if (samplesPerCycle < 2) {
 			throw new IllegalArgumentException("sampleRate is too low");
 		}
-		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
+		tauCyclesPerSample = Math.TAU / samplesPerCycle;
 		this.aftLimit = frequencyLimit / tauCyclesPerSample;
 		this.debug = debug;
 		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
@@ -45,9 +46,9 @@ public class PhaseLock implements PhaseTunerLock {
 
 	public PhaseLock(final double sampleRate, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
 		clock= new Clock(sampleRate, 0);
-		samplesPerCycle = 1;
-		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
-		this.aftLimit = frequencyLimit / tauCyclesPerSample;
+				
+		tauCyclesPerSample = Math.TAU / sampleRate;
+		this.aftLimit = frequencyLimit * tauCyclesPerSample;
 		this.debug = debug;
 		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
@@ -58,20 +59,13 @@ public class PhaseLock implements PhaseTunerLock {
 
 	@Override
 	public double getClockRateAdjustment() {
-		return frequencyAft;
-	}
-
-	private double consumeClockRateAdjustment() {
-		final double value = frequencyAft + phaseAft;
-		phaseDetector.rotate(0.1 * -phaseAft); // Debounce
-		phaseAft = 0;
-		return value;
+		return frequencyAft/tauCyclesPerSample;
 	}
 
 	@Override
 	public void accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		final double c= clock.getAndTick(consumeClockRateAdjustment());
+		final double c= clock.getAndTick(frequencyAft + phaseAft);
 		out.rotate(-c);
 		
 		previous.conjugate();
@@ -83,19 +77,25 @@ public class PhaseLock implements PhaseTunerLock {
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
 		errorLowPass.accept(out, phaseDetector);
 		errorLowPass.accept(previous, frequencyDetector);
+		
+		
+		//The phase mismatch is very accurate but it can spin to a zero magnitude
+		final double phaseMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
+		//The frequency mismatch is noisy and only useful when the phase mismatch is zero magnitude.
+		final double frequencyMismatchPhase = frequencyDetector.phase();
 
-		// These end up opposing each other a little bit, but it seems OK.
-		final double staticMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
-		final double frequencyMismatchPhase = frequencyDetector.phase() * frequencyDetector.magnitude();
-
-		out.rotate(-staticMismatchPhase);
-
+		final double phaseFix= phaseMismatchPhase;
+		final double frequencyFix= (0.00004 * phaseMismatchPhase + 0.00001d * frequencyMismatchPhase);
+		
 		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
-		phaseAft = 0.01f * (staticMismatchPhase + frequencyMismatchPhase);
-
-		// Very slow adjustments to the frequency. This one is extremely delicate.
-		frequencyAft += 0.0001f * phaseAft / samplesPerCycle;
-
+		phaseAft= phaseFix;
+		frequencyAft+= frequencyFix;
+		//frequencyAft+= frequencyMismatchPhase/100000f;
+		
+		phaseDetector.rotate(-phaseFix*0.0001);	//Debounce phase correction with forward feedback
+		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002);	//Debounce frequency correction with forward feedback
+		frequencyDetector.rotate(phaseFix*0.00001);	//Drain the opposition that builds between the phase and frequency
+		
 		if (frequencyAft > aftLimit) {
 			if (enableDebug) {
 				System.out.println("AFT limit: " + frequencyAft);
@@ -115,9 +115,9 @@ public class PhaseLock implements PhaseTunerLock {
 			vis.drawIQ(Color.blue, out);
 
 			vis.drawAnalog(Color.gray, 0);
-			vis.drawAnalog(Color.cyan, 100 * samplesPerCycle * frequencyMismatchPhase);
-			vis.drawAnalog(Color.orange, 100 * samplesPerCycle * staticMismatchPhase);
-			vis.drawAnalog(Color.pink, 100 * samplesPerCycle * frequencyAft);
+			vis.drawAnalog(Color.cyan, 0.1* frequencyMismatchPhase/tauCyclesPerSample);
+			vis.drawAnalog(Color.orange, 0.1* phaseMismatchPhase/tauCyclesPerSample);
+			vis.drawAnalog(Color.pink, frequencyAft/tauCyclesPerSample);
 			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.green, phaseDetector);
 

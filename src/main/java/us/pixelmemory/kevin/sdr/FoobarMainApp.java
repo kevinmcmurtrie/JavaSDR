@@ -39,11 +39,11 @@ public class FoobarMainApp {
 		final String highStereo = "/home/mcmurtri/SDR/SDRconnect_IQ_20250222_232434_99700000HZ.wav";
 		final String punk = "/home/mcmurtri/SDR/SDRconnect_IQ_20250227_225432_90500000HZ.wav"; //Very weak
 				
-		final float audioSampleRate= 32000f;
+		final float audioSampleRate= 41000f;
 		
 		
 		
-		final String theFile= punk;
+		final String theFile= wild;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {

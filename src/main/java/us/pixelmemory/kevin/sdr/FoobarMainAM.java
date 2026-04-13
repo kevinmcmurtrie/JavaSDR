@@ -47,11 +47,11 @@ public class FoobarMainAM {
 			vis= null;
 		}
 		
-		final String am= "/home/mcmurtri/SDR/SDRconnect_IQ_20250322_173407_741000HZ.wav";
+		final String am= "/home/mcmurtri/SDR/SDRconnect_IQ_20250322_173407_741000HZ.wav";	//Off by 1kHz
 		
 		final float audioSampleRate= 16000f;
 		final float targetSampleRate= 50000;
-		final float carrierStrengthRc =0.3f;
+		final float carrierStrengthRc =0.5f;
 		final float lockStrengthRc= 1;
 		
 		final String theFile= am;
@@ -79,12 +79,12 @@ public class FoobarMainAM {
 			RCLowPass basicStrengthFilter = new RCLowPass(sampleRate, carrierStrengthRc);
 			basicStrengthFilter.setValue(1);
 			
-			PhaseLock aft= new PhaseLock(sampleRate, 0.5, 1000d, true);
+			PhaseLock aft= new PhaseLock(sampleRate, 0.5, 1200d, true);
 			IQSample tuned = new IQSample();
-			SingleAlphaFilter audioPass= new SingleAlphaFilter(sampleRate, new LowPassAlpha(LanczosTable.of(10), 4300));
+			SingleFilter audioPass= new SingleFilter(sampleRate, new LowPass(LanczosTable.of(10), 4300));
 			IQSample t2 = new IQSample();
 			
-			IQSampleConsumer<RuntimeException> tuner = iq -> {
+			final IQSampleConsumer<RuntimeException> tuner = iq -> {
 				float basicSignal= (float)iq.magnitude();
 				float basicStrength= basicStrengthFilter.apply(basicSignal);
 				
@@ -102,9 +102,8 @@ public class FoobarMainAM {
 				float basicAudio= (basicSignal - basicStrength)/basicStrength;
 				float mixAudio = (basicAudio * (1 - lockStrength) + pllAudio * lockStrength);
 				
-				float quality = SimplerMath.clamp(1- lockStrength*Math.abs(pllOutOfPhaseAudio), 0, 1);
 				
-				float audio= audioPass.apply(0.5f * mixAudio, quality);
+				float audio= audioPass.apply(0.5f * mixAudio);
 
 				
 				if (enableDebug) {
@@ -113,8 +112,11 @@ public class FoobarMainAM {
 					t2.quad= pllOutOfPhaseAudio;
 
 					vis.markCenter();
+					vis.drawAnalog(Color.DARK_GRAY, 1);
+					vis.drawAnalog(Color.LIGHT_GRAY, 0);
+					vis.drawAnalog(Color.red, 1*lockStrength);
 					vis.drawAnalog(Color.green, audio);
-					vis.drawAnalog(Color.cyan, quality);
+					vis.drawAnalog(Color.pink, 10*basicStrength);
 					vis.drawIQ(Color.orange, t2);
 				}
 				
