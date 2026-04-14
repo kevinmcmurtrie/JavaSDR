@@ -7,7 +7,7 @@ import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 
 public class PhaseLock implements PhaseTunerLock {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 	private final boolean debug;
 	private final IQVisualizer vis;
 
@@ -57,11 +57,11 @@ public class PhaseLock implements PhaseTunerLock {
 	}
 	
 	public static void main (String args[]) throws Exception {
-		double sampleRate= 100000;
-		double frequency = 100;
+		double sampleRate= 200000;
+		double frequency = 19000;
 		
-		PhaseLock fl= new PhaseLock(sampleRate, frequency, 1, 200, true);
-		Clock c = new Clock(sampleRate, frequency +50);
+		PhaseLock fl= new PhaseLock(sampleRate, frequency, 1, 100, true);
+		Clock c = new Clock(sampleRate, frequency+60);
 		final IQSample src= new IQSample();
 		final IQSample out= new IQSample();
 		
@@ -98,10 +98,10 @@ public class PhaseLock implements PhaseTunerLock {
 		
 		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
 		phaseAft= phaseMismatchPhase;
-		frequencyAft+= (0.00004 * phaseMismatchPhase + 0.0001d * frequencyMismatchPhase);
+		frequencyAft+= (0.00004 * phaseMismatchPhase + 0.00001d * frequencyMismatchPhase);
 		
 		phaseDetector.rotate(-phaseAft*0.001);	//Debounce phase correction with forward feedback
-		frequencyDetector.rotate(-frequencyMismatchPhase*0.00002);	//Debounce frequency correction with forward feedback
+		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002);	//Debounce frequency correction with forward feedback
 		frequencyDetector.rotate(phaseAft*0.00001);	//Drain the opposition that builds between the phase and frequency
 		
 		if (frequencyAft > aftLimit) {
@@ -123,9 +123,9 @@ public class PhaseLock implements PhaseTunerLock {
 			vis.drawIQ(Color.blue, out);
 
 			vis.drawAnalog(Color.gray, 0);
-			vis.drawAnalog(Color.cyan,  frequencyMismatchPhase/tauCyclesPerSample);
+			vis.drawAnalog(Color.cyan, frequencyMismatchPhase/tauCyclesPerSample);
 			vis.drawAnalog(Color.orange, 10*phaseMismatchPhase/tauCyclesPerSample);
-			vis.drawAnalog(Color.pink, 0.5*frequencyAft/tauCyclesPerSample);
+			vis.drawAnalog(Color.pink, frequencyAft/tauCyclesPerSample);
 			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.green, phaseDetector);
 

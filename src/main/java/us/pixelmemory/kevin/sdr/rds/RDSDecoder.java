@@ -11,7 +11,6 @@ import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.SingleFilterIQ;
 import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
-import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIdentifier;
 import us.pixelmemory.kevin.sdr.tuners.PhaseShiftKeyingLock;

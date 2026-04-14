@@ -20,7 +20,7 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassStereo;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
 
 public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 
 	private static final float pilotFrequency = 19000f;
 
@@ -54,7 +54,7 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 
 	public FMBroadcast(final float sampleRate, final FloatPairConsumer<T> stereoOut, final FloatConsumer<T> rdsOut) {
 		deEmphasis = new RCLowPassStereo<>(sampleRate, 0.000075d, stereoOut);
-		pilotTuner = new PhaseLock(sampleRate, pilotFrequency, 2, 100d, enableDebug);
+		pilotTuner = new PhaseLock(sampleRate, pilotFrequency, 0.1, 100d, enableDebug);
 		sourceMultiFilter = new MultiFilter<>(sampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3]), stereoPilotFilter, monoBandFilter, stereoBandFilter, rdsBandFilter);
 		audioLeftFilter= new SingleFilter(sampleRate,audioFilter);
 		audioRightFilter= new SingleFilter(sampleRate,audioFilter);
