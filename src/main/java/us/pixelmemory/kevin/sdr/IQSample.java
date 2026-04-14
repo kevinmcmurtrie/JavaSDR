@@ -1,7 +1,7 @@
 package us.pixelmemory.kevin.sdr;
 
 public final class IQSample {
-	private static final IQSample ZERO_PHASE_1 = new IQSample(0, 1);
+	private static final IQSample ZERO_PHASE_1 = new IQSample(0);
 
 	public double in; // real, in-phase
 	public double quad; // Imaginary, quadrature
@@ -33,8 +33,8 @@ public final class IQSample {
 	}
 
 	public void setMoment(final double moment) {
-		in = Math.sin(moment);
-		quad = Math.cos(moment);
+		in = Math.cos(moment);
+		quad = Math.sin(moment);
 	}
 
 	public void multiply(final double x) {
@@ -59,7 +59,7 @@ public final class IQSample {
 
 	public void rotate(final double moment) {
 		final double rin = Math.cos(moment);
-		final double rquad = -Math.sin(moment);
+		final double rquad = Math.sin(moment);
 		final double t = in * rin - quad * rquad;
 		quad = in * rquad + quad * rin;
 		in = t;
@@ -72,7 +72,7 @@ public final class IQSample {
 	}
 
 	public double phase() {
-		return Math.atan2(in, quad);
+		return Math.atan2(quad, in);
 	}
 
 	public double magnitude() {
@@ -86,9 +86,16 @@ public final class IQSample {
 
 	public static void main(final String args[]) {
 		final IQSample s = new IQSample();
+		System.out.println(s);
+		s.setMoment(0.1);
+		System.out.println(s);
+		s.setMoment(0.2);
+		System.out.println(s);
+		
+		s.rotate(0.01);
 		for (int i = 0; i < 100; ++i) {
 			System.out.println(s);
-			s.rotate(-0.1);
+			s.rotate(0.1);
 		}
 	}
 }

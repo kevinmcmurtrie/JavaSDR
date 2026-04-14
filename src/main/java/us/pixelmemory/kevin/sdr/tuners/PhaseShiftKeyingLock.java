@@ -10,7 +10,7 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
  * Decode PSK constellations.
  */
 public final class PhaseShiftKeyingLock implements TunerLock {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 
 	private final boolean debug;
 	private final IQVisualizer vis;
@@ -98,7 +98,6 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 				
 		previous.conjugate();
 		previous.multiply(out);
-		previous.rotateRight();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.

@@ -33,7 +33,7 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 	private final SingleFilter audioLeftFilter;
 	private final SingleFilter audioRightFilter;
 	private final FloatConsumer<T> rdsOut;
-	private final float gain;
+	private final float initialGain;
 
 	
 	private static final float bandwidth= 16500f;
@@ -54,25 +54,25 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 
 	public FMBroadcast(final float sampleRate, final FloatPairConsumer<T> stereoOut, final FloatConsumer<T> rdsOut) {
 		deEmphasis = new RCLowPassStereo<>(sampleRate, 0.000075d, stereoOut);
-		pilotTuner = new PhaseLock(sampleRate, pilotFrequency, 0.005, 100d, enableDebug);
+		pilotTuner = new PhaseLock(sampleRate, pilotFrequency, 2, 100d, enableDebug);
 		sourceMultiFilter = new MultiFilter<>(sampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3]), stereoPilotFilter, monoBandFilter, stereoBandFilter, rdsBandFilter);
 		audioLeftFilter= new SingleFilter(sampleRate,audioFilter);
 		audioRightFilter= new SingleFilter(sampleRate,audioFilter);
 		pilotStrengthFilter = new RCLowPass(sampleRate, pilotStrengthRc);
 		pilotQuad= new TimeShiftToQuadrature(sampleRate, pilotFrequency);
 		this.rdsOut = rdsOut;
-		gain= sampleRate/360000;
+		initialGain= sampleRate/360000;
 		if (enableDebug) {
 			vis.syncOnColor(Color.gray);
 		}
 	}
 
 	private void bandpassIn(final float pilot, final float monoBand, final float stereoBand, final float rdsBand) throws T {
-		pilotQuad.convert(12 * pilot, pilotIQ);
+		pilotQuad.convert(16 * pilot, pilotIQ);
 		pilotTuner.accept(pilotIQ, pilotLockedIQ);
 		// The tuned pilot should be positive in the quadrature and zero in the in-phase.
 		// Calculate the strength of the stereo and scale it gradually. It will naturally fade in and out on weak signals.
-		final float pilotStrength = pilotStrengthFilter.apply((float) (5 * pilotLockedIQ.quad - 2 * Math.abs(pilotLockedIQ.in)));
+		final float pilotStrength = pilotStrengthFilter.apply((float) (5 * pilotLockedIQ.in - 2 * Math.abs(pilotLockedIQ.quad)));
 		final float stereoStrength = SimplerMath.clamp(pilotStrength - 0.1f, 0, 1);
 		final float doubleClock = (float) Math.sin(2 * pilotTuner.getClock());
 		final float stereo= stereoStrength * extraStereoGain * stereoBand * doubleClock; // L-R
@@ -102,6 +102,6 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 
 	@Override
 	public void accept(final float f) throws T {
-		sourceMultiFilter.accept(f * gain);
+		sourceMultiFilter.accept(f * initialGain);
 	}
 }

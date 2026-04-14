@@ -53,6 +53,22 @@ public class FrequencyLock implements PhaseTunerLock {
 			vis.syncOnColor(Color.cyan);
 		}
 	}
+	
+	public static void main (String args[]) throws Exception {
+		double sampleRate= 100000;
+		double frequency = 100;
+		
+		FrequencyLock fl= new FrequencyLock(sampleRate, frequency, 1, 200, true);
+		Clock c = new Clock(sampleRate, frequency +50);
+		final IQSample src= new IQSample();
+		final IQSample out= new IQSample();
+		
+		for (int i= 0; i < 10000000; ++i) {
+			src.setMoment(c.getAndTick());
+			fl.accept(src, out);
+		}
+		
+	}
 
 	@Override
 	public double getClockRateAdjustment() {
@@ -67,7 +83,6 @@ public class FrequencyLock implements PhaseTunerLock {
 		
 		previous.conjugate();
 		previous.multiply(out);
-		previous.rotateRight();
 		phaseOffset= (float)previous.phase();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
@@ -100,13 +115,14 @@ public class FrequencyLock implements PhaseTunerLock {
 			vis.markCenter();
 			vis.drawIQ(Color.red, src);
 			vis.drawAnalog(Color.gray, 0);
-			vis.drawAnalog(Color.cyan, 10 * samplesPerCycle * frequencyAft);
+			vis.drawAnalog(Color.cyan, samplesPerCycle * frequencyAft);
 			vis.drawAnalog(Color.orange, phaseOffset * samplesPerCycle);
 
 			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.blue, out);
 
-			// vis.repaint();// only interactive debugging
+//			vis.repaint();// only interactive debugging
+//			vis.fadeLight();
 		}
 		previous.set(out);
 	}

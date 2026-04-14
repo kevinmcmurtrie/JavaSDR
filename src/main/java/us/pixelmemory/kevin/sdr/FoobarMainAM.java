@@ -90,15 +90,14 @@ public class FoobarMainAM {
 				
 				iq.multiply(1/basicStrength);
 				aft.accept(iq, tuned);
-				float tunedSignal= (float)tuned.quad;
+				float tunedSignal= (float)tuned.in;
 				
 				
 				
 				float tunedStrength= carrierStrengthFilter.apply(tunedSignal);
-				float lockStrength= SimplerMath.clamp(lockStrengthFilter.apply((float) (5 * tuned.quad - 2 * Math.abs(tuned.in))), 0, 1);
+				float lockStrength= SimplerMath.clamp(lockStrengthFilter.apply((float) (5 * tuned.in - 2 * Math.abs(tuned.quad))), 0, 1);
 		
 				float pllAudio= (tunedSignal - tunedStrength)/tunedStrength;
-				float pllOutOfPhaseAudio= (float)tuned.in/tunedStrength;
 				float basicAudio= (basicSignal - basicStrength)/basicStrength;
 				float mixAudio = (basicAudio * (1 - lockStrength) + pllAudio * lockStrength);
 				
@@ -109,7 +108,7 @@ public class FoobarMainAM {
 				if (enableDebug) {
 					
 					t2.in= pllAudio;
-					t2.quad= pllOutOfPhaseAudio;
+					t2.quad= (float)tuned.quad/tunedStrength;
 
 					vis.markCenter();
 					vis.drawAnalog(Color.DARK_GRAY, 1);
@@ -125,7 +124,6 @@ public class FoobarMainAM {
 			
 			IQSampleConsumer<RuntimeException> sink= intermediateResample ? new DownsamplerIQ<>(LanczosTable.of(3), rawSampleRate, sampleRate, new IQSampleBufferThread<>(2048, "First DS", tuner)) : tuner;
 
-			
 
 			IQSample iq = new IQSample();
 			
