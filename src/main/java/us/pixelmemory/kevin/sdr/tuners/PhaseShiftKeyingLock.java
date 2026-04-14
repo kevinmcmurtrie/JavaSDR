@@ -22,7 +22,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 	private final double samplesPerCycle;
 	private final IQSample phaseDetector = new IQSample();
 	private final IQSample frequencyDetector = new IQSample();
-	private final RCLowPassIQ tuningLowPass;
+	private final RCLowPassIQ errorLowPass;
 	private final int points;
 	private final Clock clock;
 
@@ -45,7 +45,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		}
 		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
 		this.aftLimit = aftPercentLimit / tauCyclesPerSample;
-		tuningLowPass = new RCLowPassIQ(1 / aftFractionalSpeed);
+		errorLowPass = new RCLowPassIQ(sampleRate,1 / aftFractionalSpeed);
 
 		this.debug = debug;
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
@@ -62,7 +62,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		this.points = points;
 		samplesPerCycle = sampleRate;
 		this.aftLimit = aftPercentLimit;
-		tuningLowPass = new RCLowPassIQ(1 / aftFractionalSpeed);
+		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
 		this.debug = debug;
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
 		if (enableDebug && debug) {
@@ -76,12 +76,6 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		return frequencyAft;
 	}
 
-	private double consumeClockRateAdjustment() {
-		final double adj = frequencyAft + phaseAft;
-		phaseDetector.rotate(-phaseAft / 2);
-		phaseAft = 0;
-		return adj;
-	}
 
 	/**
 	 * @return Constellation point of the last tuned value
@@ -93,7 +87,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 	@Override
 	public void accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		final double c= clock.getAndTick(consumeClockRateAdjustment());
+		final double c= clock.getAndTick(frequencyAft + phaseAft);
 		out.rotate(-c);
 		
 		final float phase = (float) out.phase();
@@ -103,25 +97,29 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		}
 		rotatedPoint.set(out);
 		rotatedPoint.rotate((value * Math.TAU) / points);
-
+				
 		previous.conjugate();
 		previous.multiply(out);
 		previous.rotateRight();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
-
-		tuningLowPass.accept(rotatedPoint, phaseDetector);
-		tuningLowPass.accept(previous, frequencyDetector);
-
-		final double staticMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
-		final double frequencyMismatchPhase = frequencyDetector.phase() * frequencyDetector.magnitude();
-
+		errorLowPass.accept(rotatedPoint, phaseDetector);
+		errorLowPass.accept(previous, frequencyDetector);
+		
+		//The phase mismatch is very accurate but it can spin to a zero magnitude
+		final double phaseMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
+		//The frequency mismatch is noisy and only useful when the phase mismatch is zero magnitude.
+		final double frequencyMismatchPhase = frequencyDetector.phase();
+		
 		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
-		phaseAft = frequencyMismatchPhase + staticMismatchPhase;
-
-		// Slower adjustments to the frequency.
-		frequencyAft += phaseAft / samplesPerCycle;
+		phaseAft= phaseMismatchPhase;
+		frequencyAft+= (0.00004 * phaseMismatchPhase + 0.0001d * frequencyMismatchPhase);
+		
+		phaseDetector.rotate(-phaseAft*0.0001);	//Debounce phase correction with forward feedback
+		frequencyDetector.rotate(-frequencyMismatchPhase*0.00002);	//Debounce frequency correction with forward feedback
+		frequencyDetector.rotate(phaseAft*0.00001);	//Drain the opposition that builds between the phase and frequency
+		
 
 		if (frequencyAft > aftLimit) {
 			if (enableDebug) {
@@ -139,12 +137,13 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		if (enableDebug && debug) {
 			// vis.fadeStrong(); //DEBUG
 			vis.markCenter();
-			vis.drawIQ(Color.pink, previous);
+			//vis.drawIQ(Color.pink, previous);
 			vis.drawAnalog(Color.red, value);
-			vis.drawAnalog(Color.cyan, 100 * frequencyAft / aftLimit);
-			vis.drawAnalog(Color.orange, 100 * phaseAft / aftLimit);
+			vis.drawAnalog(Color.cyan, 100*frequencyAft/aftLimit);
+			vis.drawAnalog(Color.orange, 100*phaseAft/aftLimit);
 			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.blue, out);
+			//vis.drawIQ(Color.GREEN, rotatedPoint);
 			vis.drawIQ(Color.green, phaseDetector);
 			// vis.repaint(); //DEBUG
 		}

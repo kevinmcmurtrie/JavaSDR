@@ -21,7 +21,6 @@ public class PhaseLock implements PhaseTunerLock {
 	private double frequencyAft = 0;
 	private double phaseAft = 0;
 	private final Clock clock;
-	private float phaseOffset;
 
 	private final RCLowPassIQ errorLowPass;
 
@@ -71,30 +70,24 @@ public class PhaseLock implements PhaseTunerLock {
 		previous.conjugate();
 		previous.multiply(out);
 		previous.rotateRight();
-		phaseOffset = (float) previous.phase();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
 		errorLowPass.accept(out, phaseDetector);
 		errorLowPass.accept(previous, frequencyDetector);
 		
-		
 		//The phase mismatch is very accurate but it can spin to a zero magnitude
 		final double phaseMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
 		//The frequency mismatch is noisy and only useful when the phase mismatch is zero magnitude.
 		final double frequencyMismatchPhase = frequencyDetector.phase();
-
-		final double phaseFix= phaseMismatchPhase;
-		final double frequencyFix= (0.00004 * phaseMismatchPhase + 0.00001d * frequencyMismatchPhase);
 		
 		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
-		phaseAft= phaseFix;
-		frequencyAft+= frequencyFix;
-		//frequencyAft+= frequencyMismatchPhase/100000f;
+		phaseAft= phaseMismatchPhase;
+		frequencyAft+= (0.00004 * phaseMismatchPhase + 0.00001d * frequencyMismatchPhase);
 		
-		phaseDetector.rotate(-phaseFix*0.0001);	//Debounce phase correction with forward feedback
+		phaseDetector.rotate(-phaseAft*0.0001);	//Debounce phase correction with forward feedback
 		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002);	//Debounce frequency correction with forward feedback
-		frequencyDetector.rotate(phaseFix*0.00001);	//Drain the opposition that builds between the phase and frequency
+		frequencyDetector.rotate(phaseAft*0.00001);	//Drain the opposition that builds between the phase and frequency
 		
 		if (frequencyAft > aftLimit) {
 			if (enableDebug) {
@@ -133,7 +126,7 @@ public class PhaseLock implements PhaseTunerLock {
 
 	@Override
 	public float getPhase() {
-		return phaseOffset;
+		return (float) previous.phase();
 	}
 
 }

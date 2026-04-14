@@ -5,10 +5,13 @@ import java.awt.Color;
 import us.pixelmemory.kevin.sdr.FloatConsumer;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
+import us.pixelmemory.kevin.sdr.SimplerMath;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.SingleFilterIQ;
 import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
+import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
+import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIdentifier;
 import us.pixelmemory.kevin.sdr.tuners.PhaseShiftKeyingLock;
@@ -18,13 +21,13 @@ import us.pixelmemory.kevin.sdr.tuners.TunerLock;
  * The success rate of binary data extraction sucks.
  */
 public final class RDSDecoder implements FloatConsumer<RuntimeException> {
-	private static final boolean debugEnable = false;
+	private static final boolean debugVisualEnable = false;
+	private static final boolean debugDecodeEnable = true;
 	private static final float rdsFrequency = 57000f;
 	private static final float rdsRate = 1187.5f; // This is the data rate. The encoding is double-rate.
 	private static final float intermediateFrequency1 = rdsRate * 16;
 	private static final int digitalOversample = 6;
 	private static final float intermediateFrequency2 = rdsRate * digitalOversample;
-	private static final float inputGain = 20f;
 	private final DownsamplerIdentifier<RuntimeException> secondDownsample;
 
 	private final TunerLock frequencyShiftTuner;
@@ -38,6 +41,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	private final IQSample tunerIQ = new IQSample();
 	private final DifferentialManchesterDecoder<RuntimeException> diffManchesterDecoder;
 	private final TimeShiftToQuadrature toQuadrature;
+	private final RCLowPass gainLowPass;
 
 	private int register = 0; // 26 bits, 16 data + 10 CRC
 	private int registerSize = 0;
@@ -67,7 +71,8 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 		bandpass = new SingleFilterIQ(intermediateFrequency1, new LowPass(LanczosTable.of(64), 1.8f * rdsRate));
 
 		// Step 4. Decode the binary phase shift keying (BPSK) into 0 and 1.
-		pskTuner = new PhaseShiftKeyingLock(2, intermediateFrequency1, 0.0005d, 0.01, true);
+		// There's a big frequency downshift so it's unstable.
+		pskTuner = new PhaseShiftKeyingLock(2, intermediateFrequency1, 5d, 20, true);
 
 		// Step 5. Downsample the 0 and 1 stream to debounce edge transitions.
 		secondDownsample = new DownsamplerIdentifier<>(LanczosTable.of(2), intermediateFrequency1, intermediateFrequency2, this::acceptDownsampled);
@@ -75,10 +80,12 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 		// Step 6. Differential Manchester Decoding on the stream of 1 and 0. 01 and 10 -> true, 00 and 11 -> false.
 		diffManchesterDecoder = new DifferentialManchesterDecoder<>(digitalOversample, true, this::acceptBinaryBit);
 
-		vis = debugEnable ? new IQVisualizer() : null;
-		if (debugEnable) {
+		vis = debugVisualEnable ? new IQVisualizer() : null;
+		if (debugVisualEnable) {
 			vis.syncOnColor(Color.green);
 		}
+		
+		gainLowPass = new RCLowPass(intermediateFrequency1, 1);
 	}
 
 	/**
@@ -89,7 +96,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	public void accept(final float f) {
 		// This isn't quite legit because it's going to fake the quadrature phase from a phase shift signal.
 		// A high sample rate helps make the phase shift signal smaller.
-		toQuadrature.convert(f * inputGain, signalToIQ);
+		toQuadrature.convert(f, signalToIQ);
 		frequencyShiftTuner.accept(signalToIQ, frequencyShiftIQ);
 		firstDownsample.accept(frequencyShiftIQ);
 	}
@@ -102,6 +109,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 */
 	void acceptIntermediateFrequency(final IQSample iq) {
 		bandpass.accept(iq, bandpassIQ);
+		bandpassIQ.multiply(SimplerMath.clamp(1f/gainLowPass.apply((float)bandpassIQ.magnitude()), 0.1f, 100f));
 		pskTuner.accept(bandpassIQ, tunerIQ);
 		secondDownsample.accept(pskTuner.getValue());
 	}
@@ -114,7 +122,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 */
 	private void acceptDownsampled(final int value) {
 		diffManchesterDecoder.accept(value == 1);
-		if (debugEnable) {
+		if (debugVisualEnable) {
 			vis.drawAnalog(Color.red, 2 + value);
 		}
 	}
@@ -125,7 +133,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 * @param value bit
 	 */
 	private void acceptBinaryBit(final boolean value) {
-		if (debugEnable) {
+		if (debugVisualEnable) {
 			for (int i = 0; i < digitalOversample; ++i) {
 				vis.drawAnalog(Color.green, value ? 4.5 : 4);
 			}
@@ -162,7 +170,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 			}
 
 			if (offsetBlock != null) {
-				if (debugEnable) {
+				if (debugDecodeEnable) {
 					System.out.println(offsetBlock);
 				}
 				// FIXME - check that error correction worked.
@@ -193,7 +201,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 			case D -> {
 				blockD = word;
 				programInfo.accept(blockA, blockB, blockC, blockD);
-				if (debugEnable) {
+				if (debugDecodeEnable) {
 					System.out.println(programInfo);
 				}
 			}

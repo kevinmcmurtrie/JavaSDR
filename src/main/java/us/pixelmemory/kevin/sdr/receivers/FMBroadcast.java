@@ -9,7 +9,6 @@ import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.SimplerMath;
 import us.pixelmemory.kevin.sdr.firfilters.BandPass;
 import us.pixelmemory.kevin.sdr.firfilters.FilterBuilder;
-import us.pixelmemory.kevin.sdr.firfilters.FilterFIR;
 import us.pixelmemory.kevin.sdr.firfilters.IdentityPass;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;

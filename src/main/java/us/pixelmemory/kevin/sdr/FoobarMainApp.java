@@ -43,7 +43,7 @@ public class FoobarMainApp {
 		
 		
 		
-		final String theFile= wild;
+		final String theFile= demo;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {
@@ -74,7 +74,7 @@ public class FoobarMainApp {
 			RDSDecoder rds= new RDSDecoder (sampleRate);
 			FMBroadcast<RuntimeException> stereo= new FMBroadcast<>(sampleRate, audioSampler, rds);
 			
-			FrequencyLock aft= new FrequencyLock(sampleRate, 10, 1000d, false);
+			final FrequencyLock aft= new FrequencyLock(sampleRate, 10, 1000d, true);
 
 			IQSample tuned = new IQSample();
 			final float gain= sampleRate/(2*targetSampleRate);
