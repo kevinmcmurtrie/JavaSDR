@@ -10,13 +10,12 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
  * Decode PSK constellations.
  */
 public final class PhaseShiftKeyingLock implements TunerLock {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 
 	private final boolean debug;
 	private final IQVisualizer vis;
 
 	private final IQSample previous = new IQSample();
-	private final IQSample rotatedPoint = new IQSample();
 	private final double samplesPerCycle;
 	private final IQSample phaseDetector = new IQSample();
 	private final IQSample frequencyDetector = new IQSample();
@@ -93,16 +92,19 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		if (value < 0) {
 			value += points;
 		}
-		rotatedPoint.set(out);
-		rotatedPoint.rotate((value * Math.TAU) / points);
+		
+		if (enableDebug && debug) {
+			vis.drawIQ(Color.blue, out);
+		}
+
+		out.rotate((value * Math.TAU) / points);
 				
 		previous.conjugate();
 		previous.multiply(out);
-		previous.rotateRight();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
-		errorLowPass.accept(rotatedPoint, phaseDetector);
+		errorLowPass.accept(out, phaseDetector);
 		errorLowPass.accept(previous, frequencyDetector);
 		
 		//The phase mismatch is very accurate but it can spin to a zero magnitude
@@ -116,7 +118,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 		
 		phaseDetector.rotate(-phaseAft*0.0001);	//Debounce phase correction with forward feedback
 		frequencyDetector.rotate(-frequencyMismatchPhase*0.00002);	//Debounce frequency correction with forward feedback
-		frequencyDetector.rotate(phaseAft*0.00001);	//Drain the opposition that builds between the phase and frequency
+		frequencyDetector.rotate(phaseAft*0.0001);	//Drain the opposition that builds between the phase and frequency
 		
 
 		if (frequencyAft > aftLimit) {
@@ -140,7 +142,7 @@ public final class PhaseShiftKeyingLock implements TunerLock {
 			vis.drawAnalog(Color.cyan, 100*frequencyAft/aftLimit);
 			vis.drawAnalog(Color.orange, 100*phaseAft/aftLimit);
 			vis.drawIQ(Color.magenta, frequencyDetector);
-			vis.drawIQ(Color.blue, out);
+			
 			//vis.drawIQ(Color.GREEN, rotatedPoint);
 			vis.drawIQ(Color.green, phaseDetector);
 			// vis.repaint(); //DEBUG

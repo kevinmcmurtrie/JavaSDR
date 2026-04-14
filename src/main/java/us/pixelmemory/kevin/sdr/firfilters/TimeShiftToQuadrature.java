@@ -41,7 +41,7 @@ public final class TimeShiftToQuadrature {
 			delayIdx0 += circBuffer.length;
 		}
 		
-		out.set(f, -(splitweight * circBuffer[delayIdx1] + (1 - splitweight) * circBuffer[delayIdx0]));
+		out.set(f, (splitweight * circBuffer[delayIdx1] + (1 - splitweight) * circBuffer[delayIdx0]));
 		circBuffer[pos] = f;
 	}
 

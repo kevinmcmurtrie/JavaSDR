@@ -170,8 +170,8 @@ public class IQVisualizer extends JPanel {
 	// Vertical = in, horizontal= quadrature
 	public void drawIQ(final Color c, final IQSample s) {
 		if (s != null) {
-			final int x = 500 + (int) (400 * s.quad);
-			final int y = 500 - (int) (400 * s.in);
+			final int x = 500 + (int) (400 * s.in);
+			final int y = 500 - (int) (400 * s.quad);
 			imgG.setColor(c);
 			imgG.fillOval(x, y, 9, 9);
 			final Point2D.Float previous = previousPoints.get(c);

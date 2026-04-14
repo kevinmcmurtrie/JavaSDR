@@ -55,6 +55,22 @@ public class PhaseLock implements PhaseTunerLock {
 			vis.syncOnColor(Color.orange);
 		}
 	}
+	
+	public static void main (String args[]) throws Exception {
+		double sampleRate= 200000;
+		double frequency = 19000;
+		
+		PhaseLock fl= new PhaseLock(sampleRate, frequency, 1, 100, true);
+		Clock c = new Clock(sampleRate, frequency+60);
+		final IQSample src= new IQSample();
+		final IQSample out= new IQSample();
+		
+		for (int i= 0; i < 10000000; ++i) {
+			src.setMoment(c.getAndTick());
+			fl.accept(src, out);
+		}
+		
+	}
 
 	@Override
 	public double getClockRateAdjustment() {
@@ -69,7 +85,6 @@ public class PhaseLock implements PhaseTunerLock {
 		
 		previous.conjugate();
 		previous.multiply(out);
-		previous.rotateRight();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
@@ -77,7 +92,7 @@ public class PhaseLock implements PhaseTunerLock {
 		errorLowPass.accept(previous, frequencyDetector);
 		
 		//The phase mismatch is very accurate but it can spin to a zero magnitude
-		final double phaseMismatchPhase = phaseDetector.phase() * phaseDetector.magnitude();
+		final double phaseMismatchPhase = phaseDetector.phase() * (phaseDetector.magnitude()/frequencyDetector.magnitude());
 		//The frequency mismatch is noisy and only useful when the phase mismatch is zero magnitude.
 		final double frequencyMismatchPhase = frequencyDetector.phase();
 		
@@ -85,7 +100,7 @@ public class PhaseLock implements PhaseTunerLock {
 		phaseAft= phaseMismatchPhase;
 		frequencyAft+= (0.00004 * phaseMismatchPhase + 0.00001d * frequencyMismatchPhase);
 		
-		phaseDetector.rotate(-phaseAft*0.0001);	//Debounce phase correction with forward feedback
+		phaseDetector.rotate(-phaseAft*0.001);	//Debounce phase correction with forward feedback
 		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002);	//Debounce frequency correction with forward feedback
 		frequencyDetector.rotate(phaseAft*0.00001);	//Drain the opposition that builds between the phase and frequency
 		
@@ -108,8 +123,8 @@ public class PhaseLock implements PhaseTunerLock {
 			vis.drawIQ(Color.blue, out);
 
 			vis.drawAnalog(Color.gray, 0);
-			vis.drawAnalog(Color.cyan, 0.1* frequencyMismatchPhase/tauCyclesPerSample);
-			vis.drawAnalog(Color.orange, 0.1* phaseMismatchPhase/tauCyclesPerSample);
+			vis.drawAnalog(Color.cyan, frequencyMismatchPhase/tauCyclesPerSample);
+			vis.drawAnalog(Color.orange, 10*phaseMismatchPhase/tauCyclesPerSample);
 			vis.drawAnalog(Color.pink, frequencyAft/tauCyclesPerSample);
 			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.green, phaseDetector);
