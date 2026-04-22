@@ -1,16 +1,16 @@
 package us.pixelmemory.kevin.sdr.firfilters;
 
-public record IdentityPass() implements FilterBuilder {
-	public static final FilterBuilder INSTANCE = new IdentityPass();
+public record JustZeros() implements FilterBuilder {
+	public static final JustZeros INSTANCE = new JustZeros();
 	private static final FilterFIR FIR = new FilterFIR() {
 		@Override
 		public int latency() {
-			return 1;
+			return 0;
 		}
 
 		@Override
 		public float apply(final float[] circBuf, final int pos) {
-			return circBuf[pos];
+			return 0f;
 		}
 	};
 

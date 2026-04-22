@@ -10,4 +10,11 @@ public final class SimplerMath {
 		}
 		return (value >= min) ? max : min;
 	}
+	
+	public static double clamp(final double value, final double min, final double max) {
+		if ((value >= min) && (value <= max)) {
+			return value;
+		}
+		return (value >= min) ? max : min;
+	}
 }

@@ -76,7 +76,7 @@ public final class IQSample {
 	}
 
 	public double magnitude() {
-		return Math.sqrt(Math.pow(in, 2) + Math.pow(quad, 2));
+		return Math.hypot(in, quad);
 	}
 
 	@Override

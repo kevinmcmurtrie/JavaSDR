@@ -28,7 +28,7 @@ public class FoobarMainApp {
 
 	public static void main(String[] args) throws InterruptedException, UnsupportedAudioFileException, IOException, LineUnavailableException {
 		final float IQGain = 10f;
-		final float targetSampleRate= 400000; //FIXME
+		final float targetSampleRate= RDSDecoder.rdsFrequency * 5; //FIXME
 		final String music= "/home/mcmurtri/SDR/SDRconnect_IQ_20250211_155243_98500000HZ.wav"; //Trash pilot
 		final String talk= "/home/mcmurtri/SDR/SDRconnect_IQ_20250214_122829_105700000HZ.wav"; //Super clean.  PI=0x499B
 		final String demo= "/home/mcmurtri/SDR/SDRuno_20200907_184033Z_88110kHz.wav"; //Off-center pilot
@@ -45,7 +45,7 @@ public class FoobarMainApp {
 		
 		
 		
-		final String theFile= talk;
+		final String theFile= highStereo;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {

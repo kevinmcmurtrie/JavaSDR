@@ -6,7 +6,7 @@ public final class Clock {
 
 	public Clock(final double sampleRate, final double frequency) {
 		if (2*Math.abs(frequency) > sampleRate) {
-			throw new IllegalArgumentException("sampleRate is too low");
+			throw new IllegalArgumentException("sampleRate is too low: frequency=" + frequency + " sampleRate=" + sampleRate);
 		}
 		tauPerSample = frequency * Math.TAU / sampleRate;
 	}

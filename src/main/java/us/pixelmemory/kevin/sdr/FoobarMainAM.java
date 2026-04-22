@@ -35,7 +35,7 @@ import us.pixelmemory.kevin.sdr.sampleformat.SampleConverters.SampleReader;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
 
 public class FoobarMainAM {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 
 	public static void main(String[] args) throws InterruptedException, UnsupportedAudioFileException, IOException, LineUnavailableException {
 		final float IQGain = 30f;
@@ -50,10 +50,8 @@ public class FoobarMainAM {
 		final String am= "/home/mcmurtri/SDR/SDRconnect_IQ_20250322_173407_741000HZ.wav";	//Off by 1kHz
 		
 		final float audioSampleRate= 16000f;
-		final float targetSampleRate= 50000;
-		final float carrierStrengthRc =0.5f;
-		final float lockStrengthRc= 1;
-		
+		final float targetSampleRate= 100000;
+		final float carrierStrengthRc =0.5f;		
 		final String theFile= am;
 		
 
@@ -75,11 +73,10 @@ public class FoobarMainAM {
 
 			RCLowPass carrierStrengthFilter = new RCLowPass(sampleRate, carrierStrengthRc);
 			carrierStrengthFilter.setValue(1);
-			RCLowPass lockStrengthFilter = new RCLowPass(sampleRate, lockStrengthRc);
 			RCLowPass basicStrengthFilter = new RCLowPass(sampleRate, carrierStrengthRc);
 			basicStrengthFilter.setValue(1);
 			
-			PhaseLock aft= new PhaseLock(sampleRate, 0.5, 1200d, true);
+			PhaseLock aft= new PhaseLock(sampleRate, 0.1, 1200d, enableDebug);
 			IQSample tuned = new IQSample();
 			SingleFilter audioPass= new SingleFilter(sampleRate, new LowPass(LanczosTable.of(10), 4300));
 			IQSample t2 = new IQSample();
@@ -95,7 +92,7 @@ public class FoobarMainAM {
 				
 				
 				float tunedStrength= carrierStrengthFilter.apply(tunedSignal);
-				float lockStrength= SimplerMath.clamp(lockStrengthFilter.apply((float) (5 * tuned.in - 2 * Math.abs(tuned.quad))), 0, 1);
+				float lockStrength= aft.getLockQuality();
 		
 				float pllAudio= (tunedSignal - tunedStrength)/tunedStrength;
 				float basicAudio= (basicSignal - basicStrength)/basicStrength;
