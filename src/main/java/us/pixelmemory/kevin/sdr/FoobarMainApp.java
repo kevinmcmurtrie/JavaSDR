@@ -45,7 +45,7 @@ public class FoobarMainApp {
 		
 		
 		
-		final String theFile= highStereo;
+		final String theFile= punk;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {
@@ -82,7 +82,6 @@ public class FoobarMainApp {
 			final float gain= sampleRate/(2*targetSampleRate);
 			IQSampleConsumer<RuntimeException> fmDemod = iq -> {aft.accept(iq, tuned);stereo.accept(aft.getPhase()*gain);};
 			
-			//FIXME: Thread leak
 			IQSampleConsumer<RuntimeException> sink= intermediateResample ? new DownsamplerIQ<>(LanczosTable.of(3), rawSampleRate, sampleRate, new IQSampleBufferThread<>(2048, "First DS", fmDemod)) : fmDemod;
 		
 
