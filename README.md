@@ -1,10 +1,10 @@
 # JavaSDR
 Playing around with SDR code in Java
 
-This is my first time entering the SDR world.  I hope for this to someday be used to build streaming media server or media device.  For now, it's a pile of hacky code.
+Early learning on software defined radios.  I hope for this to someday be used to build streaming media server or media device.  It's a bit hacky and experimental now.
 
-Broadcast FM Stereo is working except for maybe audio level compensation.
-RDS, which would be critical for a media device, is a lousy work in progress.
-AM, narrow band FM, SDR interfacing, and tuning multiple stations from wideband sampling are TODO.
+- Broadcast FM Stereo is working
+  - RDS is somewhat working but the phase lock needs updating to reduce jitter.
+- Broadcast AM with synchronous decoding works.  AM stereo should be trivial if I ever find such a station for testing.
 
-Hey, SDRPlay.  Document the damn API for your nRSP-ST.  My project needs your $$$ SDR working.
+Hey, SDRPlay.  Document the damn API for your nRSP-ST.
