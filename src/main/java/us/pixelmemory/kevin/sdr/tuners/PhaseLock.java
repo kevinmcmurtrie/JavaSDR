@@ -21,13 +21,13 @@ public class PhaseLock implements PhaseTunerLock {
 
 	private double frequencyAft = 0;
 	private double phaseAft = 0;
-	private float lockQuality= 0;
 	private final Clock clock;
 
 	private final RCLowPassIQ errorFastLowPass;
 	private final RCLowPassIQ errorSlowLowPass;
 
 	private final IQSample phaseDetectorSlow = new IQSample(0,0);//Normal running phase detector.  Let accumulate.
+	private final IQSample lockQuality = new IQSample(0,0); //Normal running phase detector, but without debounce
 	private final IQSample phaseDetectorFast = new IQSample(1, 0);	//Used when the slow one doesn't catch. Start off strong.
 	private final IQSample frequencyDetector = new IQSample(0.5, 0);		//Used when no phase detector catches.  Start off hopeful of an easy lock.
 
@@ -100,11 +100,10 @@ public class PhaseLock implements PhaseTunerLock {
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
 		errorSlowLowPass.accept(out, phaseDetectorSlow);
+		errorFastLowPass.accept(out, lockQuality);
 		errorFastLowPass.accept(out, phaseDetectorFast);
 		errorSlowLowPass.accept(previous, frequencyDetector);
-		
-		lockQuality= SimplerMath.clamp(4f * (float)phaseDetectorSlow.in - 10f * Math.abs((float)phaseDetectorSlow.quad), 0f, 1f);
-		
+				
 		final double slowLockStrength= SimplerMath.clamp(2*phaseDetectorSlow.magnitude(), 0, 1);
 		final double fastLockStrength= SimplerMath.clamp(2*phaseDetectorFast.magnitude(), 0.2, 1);
 		
@@ -163,7 +162,7 @@ public class PhaseLock implements PhaseTunerLock {
 	}
 	
 	public float getLockQuality () {
-		return lockQuality;
+		return SimplerMath.clamp(2f * (float)lockQuality.in - 10f * Math.abs((float)lockQuality.quad), 0f, 1f);
 	}
 
 }

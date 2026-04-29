@@ -1,6 +1,7 @@
 package us.pixelmemory.kevin.sdr.firfilters;
 
 import us.pixelmemory.kevin.sdr.IQSample;
+import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 import us.pixelmemory.kevin.sdr.IQSampleProcessor;
 
 public final class SingleFilterIQ implements IQSampleProcessor<RuntimeException> {
@@ -24,6 +25,14 @@ public final class SingleFilterIQ implements IQSampleProcessor<RuntimeException>
 		final int sampleIdx = (pos - sampleLatency) & (circBufI.length - 1);
 		out.set(filter.apply(circBufI, sampleIdx), filter.apply(circBufQ, sampleIdx));
 		pos = (pos + 1) & (circBufI.length - 1);
+	}
+	
+	public <T extends Throwable> IQSampleConsumer<T> asIQSampleConsumer (IQSampleConsumer<T> out) {
+		final IQSample outSample= new IQSample();
+		return (inSample) -> {
+			accept(inSample, outSample);
+			out.accept(outSample);
+		};
 	}
 
 }

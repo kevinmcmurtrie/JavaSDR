@@ -1,6 +1,7 @@
 package us.pixelmemory.kevin.sdr.iirfilters;
 
 import us.pixelmemory.kevin.sdr.FloatFunction;
+import us.pixelmemory.kevin.sdr.SimplerMath;
 
 public final class RCLowPass implements FloatFunction<RuntimeException> {
 	private final double ratio;
@@ -20,6 +21,24 @@ public final class RCLowPass implements FloatFunction<RuntimeException> {
 	
 	public void setValue (double value) {
 		acc= value;
+	}
+	
+	public float applyMaxClamped (final float f, double max) {
+		acc += (f - acc) / ratio;
+		acc= Math.min(acc, max);
+		return (float)acc;
+	}
+	
+	public float applyMinClamped (final float f, double min) {
+		acc += (f - acc) / ratio;
+		acc= Math.max(acc, min);
+		return (float)acc;
+	}
+	
+	public float applyClamped (final float f, double min, double max) {
+		acc += (f - acc) / ratio;
+		acc= SimplerMath.clamp(acc, min, max);
+		return (float)acc;
 	}
 
 	@Override

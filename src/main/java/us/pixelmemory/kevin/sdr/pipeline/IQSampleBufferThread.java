@@ -7,6 +7,11 @@ import java.util.concurrent.locks.LockSupport;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 
+/**
+ * Push IQSamples from one thread to another with an asynchronous buffer.
+ * Latency is as small as one sample at the cost of some CPU synchronization overhead. 
+ * @param <T> The exception that may be thrown from the consumer
+ */
 public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsumer<T> {
 	private static final long timeOutNanos = TimeUnit.SECONDS.toNanos(1);
 	private final IQSampleConsumer<T> out;

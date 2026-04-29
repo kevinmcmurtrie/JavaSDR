@@ -5,9 +5,9 @@ import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 abstract class AccumulatorBase {
 	protected final LanczosTable lanczos;
 	protected float inPosition;
-	protected final float step;
+	protected final double step;
 
-	public AccumulatorBase(final LanczosTable lanczos, final float inPosition, final float inToOut) {
+	public AccumulatorBase(final LanczosTable lanczos, final float inPosition, final double inToOut) {
 		this.lanczos = lanczos;
 		this.inPosition = inPosition;
 		this.step = 1 / inToOut;

@@ -28,26 +28,22 @@ public class SampleConverters {
 	public static <T extends Throwable> FloatConsumer<T> createPcmSignedMono16BitLe(final ByteArrayConsumer<T> out) {
 		return new FloatConsumer<>() {
 			// TODO - Dither or is there already enough noise?
-			final byte buffer[] = new byte[2];
+			final byte buffer[] = new byte[2 * 64];
+			int pos = 0;
 
 			@Override
 			public void accept(float f) throws T {
-				if (f > 1f) {
-					f = 1f;
-					if (debug) {
-						System.out.println("Clip: " + f);// DEBUG
-					}
-				} else if (f < -1f) {
-					f = -1f;
-					if (debug) {
-						System.out.println("Clip: " + f);// DEBUG
-
-					}
+				if (debug && ((f > 1f) || (f < -1f))) {
+					System.out.println("Clip: " + f);// DEBUG
 				}
-				final int i = Math.round(f * 32767);
-				buffer[0] = (byte) (i & 0xff);
-				buffer[1] = (byte) (i >> 8);
-				out.accept(buffer, 0, 2);
+
+				final int mono = Math.round(SimplerMath.clamp(32767 * f, -32768, 32767));
+				buffer[pos++] = (byte) (mono & 0xff);
+				buffer[pos++] = (byte) (mono >> 8);
+				if (pos == buffer.length) {
+					pos = 0;
+					out.accept(buffer, 0, buffer.length);
+				}
 			}
 		};
 	}

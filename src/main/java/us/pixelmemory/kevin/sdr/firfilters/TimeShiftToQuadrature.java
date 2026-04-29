@@ -2,8 +2,11 @@ package us.pixelmemory.kevin.sdr.firfilters;
 
 import java.awt.Color;
 
+import us.pixelmemory.kevin.sdr.FloatConsumer;
 import us.pixelmemory.kevin.sdr.IQSample;
+import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
+import us.pixelmemory.kevin.sdr.tuners.Clock;
 
 /**
  * Converts a fixed frequency signal to a positive frequency in IQ format using a fixed quarter wave delay.
@@ -43,6 +46,14 @@ public final class TimeShiftToQuadrature {
 		
 		out.set(f, (splitweight * circBuffer[delayIdx1] + (1 - splitweight) * circBuffer[delayIdx0]));
 		circBuffer[pos] = f;
+	}
+	
+	public  <T extends Throwable> FloatConsumer<T> asConsumer (final IQSampleConsumer<T> out) {
+		final IQSample iqOut= new IQSample();
+		return (f) -> {
+			convert(f, iqOut);
+			out.accept(iqOut);
+		};
 	}
 
 	public static void main(String args[]) throws InterruptedException {

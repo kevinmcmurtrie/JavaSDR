@@ -1,5 +1,6 @@
 package us.pixelmemory.kevin.sdr.firfilters;
 
+import us.pixelmemory.kevin.sdr.FloatConsumer;
 import us.pixelmemory.kevin.sdr.FloatFunction;
 
 public final class SingleFilter implements FloatFunction<RuntimeException> {
@@ -20,6 +21,12 @@ public final class SingleFilter implements FloatFunction<RuntimeException> {
 		final int sampleIdx = (pos - sampleLatency) & (circBuf.length - 1);
 		pos = (pos + 1) & (circBuf.length - 1);
 		return filter.apply(circBuf, sampleIdx);
+	}
+	
+	public <T extends Throwable> FloatConsumer<T> asFloatConsumer (FloatConsumer<T> out) {
+		return f -> {
+			out.accept(apply(f));
+		};
 	}
 
 	// public static void main (String args[]) {

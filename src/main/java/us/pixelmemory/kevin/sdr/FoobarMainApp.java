@@ -45,7 +45,7 @@ public class FoobarMainApp {
 		
 		
 		
-		final String theFile= punk;
+		final String theFile= talk;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {
