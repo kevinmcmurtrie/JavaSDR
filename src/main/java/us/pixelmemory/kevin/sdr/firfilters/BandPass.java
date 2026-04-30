@@ -3,54 +3,50 @@ package us.pixelmemory.kevin.sdr.firfilters;
 import java.awt.Color;
 
 import us.pixelmemory.kevin.sdr.FloatArrayConsumer;
-import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.tuners.Clock;
-import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
 
 /**
- * Lanczos A should be a higher level for narrower bands.  If the bandwidth is too narrow and the Lanczos level too low,
- * there will be out of band ringing that goes in and out of phase.  These are the ripple ends of the Lanczos excessively amplified.
+ * Lanczos A should be a higher level for narrower bands. If the bandwidth is too narrow and the Lanczos level too low,
+ * there will be out of band ringing that goes in and out of phase. These are the ripple ends of the Lanczos excessively amplified.
  */
 public record BandPass(LanczosTable lanczos, float lowBand, float highBand) implements FilterBuilder {
-	
-	public static void main(String args[]) throws InterruptedException {
-		float sampleRate = 1000000;
-		float frequency = 19000;
-		float modFrequency= 40;
-		float modGain= 0.1f;
+
+	public static void main(final String args[]) throws InterruptedException {
+		final float sampleRate = 1000000;
+		final float frequency = 19000;
+		final float modFrequency = 40;
+		final float modGain = 0.1f;
 
 		final IQVisualizer vis = new IQVisualizer();
-		
-		
+
 		final FloatArrayConsumer<RuntimeException> consumer = f -> {
 			vis.drawAnalog(Color.white, 2);
 			vis.drawAnalog(Color.lightGray, 4);
 			vis.drawAnalog(Color.gray, 0);
-			vis.drawAnalog(Color.red, 2* f[0] +2);
-			vis.drawAnalog(Color.blue, 2* f[1] +2);
+			vis.drawAnalog(Color.red, 2 * f[0] + 2);
+			vis.drawAnalog(Color.blue, 2 * f[1] + 2);
 			vis.drawAnalog(Color.orange, f[2]);
 			vis.repaint();
 			vis.fadeLight();
 		};
-		
-		final FilterBuilder filterBuilder = new BandPass(LanczosTable.of(6),  frequency - 100f, frequency + 100f);
-		MultiFilter<RuntimeException> mf = new MultiFilter<>(sampleRate, consumer, 2, filterBuilder);
 
-		Clock c = new Clock(sampleRate, frequency);
-		Clock c2 = new Clock(sampleRate, modFrequency);
+		final FilterBuilder filterBuilder = new BandPass(LanczosTable.of(6), frequency - 100f, frequency + 100f);
+		final MultiFilter<RuntimeException> mf = new MultiFilter<>(sampleRate, consumer, 2, filterBuilder);
+
+		final Clock c = new Clock(sampleRate, frequency);
+		final Clock c2 = new Clock(sampleRate, modFrequency);
 
 		for (int i = 0; i < 10000000; ++i) {
-			float mod= (float) Math.cos(c2.getAndTick());
-			float src = (float) Math.cos(c.getAndTick(modGain*mod));
+			final float mod = (float) Math.cos(c2.getAndTick());
+			final float src = (float) Math.cos(c.getAndTick(modGain * mod));
 
 			mf.accept(src, src, mod);
 			Thread.sleep(1);
 
 		}
 	}
-	
-	
+
 	@Override
 	public BandPassFIR build(final float sampleRate) {
 		// IQVisualizer vis = new IQVisualizer();

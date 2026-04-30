@@ -17,7 +17,7 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.pipeline.IQSampleBufferThread;
 import us.pixelmemory.kevin.sdr.rds.RDSDecoder;
-import us.pixelmemory.kevin.sdr.receivers.FMBroadcast;
+import us.pixelmemory.kevin.sdr.receivers.FMBroadcastOld;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerStereo;
 import us.pixelmemory.kevin.sdr.sampleformat.SampleConverters;
@@ -74,9 +74,9 @@ public class FoobarMainApp {
 			
 			DownsamplerStereo<RuntimeException> audioSampler= new DownsamplerStereo<>(LanczosTable.of(3), sampleRate, audioSampleRate, SampleConverters.createPcmSignedStereo16BitLe(out));
 			RDSDecoder rds= new RDSDecoder (sampleRate);
-			FMBroadcast<RuntimeException> stereo= new FMBroadcast<>(sampleRate, audioSampler, rds);
+			FMBroadcastOld<RuntimeException> stereo= new FMBroadcastOld<>(sampleRate, audioSampler, rds);
 			
-			final FrequencyLock aft= new FrequencyLock(sampleRate, 10, 1000d, true);
+			final FrequencyLock aft= new FrequencyLock(sampleRate, 10, 1000f, true);
 
 			IQSample tuned = new IQSample();
 			final float gain= sampleRate/(2*targetSampleRate);

@@ -7,7 +7,7 @@ public interface TunerLock extends IQSampleProcessor<RuntimeException>{
 	/**
 	 * @return Hz clock adjustment
 	 */
-	double getClockRateAdjustment();
+	float getClockRateAdjustment();
 
 	static double unwrapPhaseDistance(final double d) {
 		if (d > Math.PI) {

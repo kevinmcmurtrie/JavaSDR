@@ -6,7 +6,6 @@ import us.pixelmemory.kevin.sdr.FloatConsumer;
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
-import us.pixelmemory.kevin.sdr.tuners.Clock;
 
 /**
  * Converts a fixed frequency signal to a positive frequency in IQ format using a fixed quarter wave delay.
@@ -64,15 +63,15 @@ public final class TimeShiftToQuadrature {
 
 		TimeShiftToQuadrature ts = new TimeShiftToQuadrature(sampleRate, frequency);
 
-		final double tauCyclesPerSample = frequency * Math.TAU / sampleRate;
+		final float tauCyclesPerSample = (float)(frequency * Math.TAU / sampleRate);
 
 		IQSample iq = new IQSample();
 		IQSample fakeIq = new IQSample();
 
 		for (int i = 0; i < 10000; ++i) {
-			double c = i * tauCyclesPerSample;
+			float c = i * tauCyclesPerSample;
 			iq.setMoment(c);
-			ts.convert((float) iq.in, fakeIq);
+			ts.convert(iq.in, fakeIq);
 
 			vis.fade();
 			vis.drawIQ(Color.red, iq);

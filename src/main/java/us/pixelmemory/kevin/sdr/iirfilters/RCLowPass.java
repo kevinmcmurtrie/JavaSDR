@@ -23,19 +23,19 @@ public final class RCLowPass implements FloatFunction<RuntimeException> {
 		acc= value;
 	}
 	
-	public float applyMaxClamped (final float f, double max) {
+	public float applyMaxClamped (final float f, float max) {
 		acc += (f - acc) / ratio;
 		acc= Math.min(acc, max);
 		return (float)acc;
 	}
 	
-	public float applyMinClamped (final float f, double min) {
+	public float applyMinClamped (final float f, float min) {
 		acc += (f - acc) / ratio;
 		acc= Math.max(acc, min);
 		return (float)acc;
 	}
 	
-	public float applyClamped (final float f, double min, double max) {
+	public float applyClamped (final float f, float min, float max) {
 		acc += (f - acc) / ratio;
 		acc= SimplerMath.clamp(acc, min, max);
 		return (float)acc;

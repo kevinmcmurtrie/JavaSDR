@@ -33,7 +33,7 @@ public class FoobarMainAM {
 		}
 		
 		final String am= "/home/mcmurtri/SDR/SDRconnect_IQ_20250322_173407_741000HZ.wav";
-		final double srckHz= 741;
+		final float srckHz= 741;
 		
 		final float audioSampleRate= 44100f;	
 		final String theFile= am;
@@ -50,11 +50,11 @@ public class FoobarMainAM {
 			FloatConsumer<RuntimeException> audioOutput= SampleConverters.createPcmSignedMono16BitLe(line::write);
 			
 			
-			final double wantedRadiokHz = 741;
-			final double radioAFTRange = 1000;
+			final float wantedRadiokHz = 740;
+			final float radioAFTRange = 1000;
 			final float audioBandwidth = 10200f;
 			
-			final AM<RuntimeException> amRadio= new AM<>(sr.getSampleRateHz(), 1000d*(wantedRadiokHz-srckHz), radioAFTRange, audioOutput, audioSampleRate, audioBandwidth, enableDebug);
+			final AM<RuntimeException> amRadio= new AM<>(sr.getSampleRateHz(), 1000f*(srckHz-wantedRadiokHz), radioAFTRange, audioOutput, audioSampleRate, audioBandwidth, enableDebug);
 
 			IQSample iq = new IQSample();
 			while (sr.read(iq)) {

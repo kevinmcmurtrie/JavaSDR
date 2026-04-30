@@ -1,18 +1,24 @@
 package us.pixelmemory.kevin.sdr.tuners;
 
+/**
+ * Clock helper class.  This is in double precision to avoid jitter, squealing, and unpredictable drift.
+ */
 public final class Clock {
 	public final double tauPerSample;
 	private double clock= 0;
 
 	public Clock(final double sampleRate, final double frequency) {
-		if (2*Math.abs(frequency) > sampleRate) {
+		tauPerSample = frequency * Math.TAU / sampleRate;
+		if (Math.abs(tauPerSample) >= Math.PI) {
 			throw new IllegalArgumentException("sampleRate is too low: frequency=" + frequency + " sampleRate=" + sampleRate);
 		}
-		tauPerSample = frequency * Math.TAU / sampleRate;
 	}
 	
 	public Clock(final double tauPerSample) {
 		this.tauPerSample = tauPerSample;
+		if (Math.abs(tauPerSample) >= Math.PI) {
+			throw new IllegalArgumentException("Invalid tauPerSample=" + tauPerSample);
+		}
 	}
 	
 	public double getClock() {

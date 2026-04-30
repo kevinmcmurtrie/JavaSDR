@@ -4,7 +4,7 @@ import us.pixelmemory.kevin.sdr.FloatConsumer;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 
 public class Downsampler<T extends Throwable> implements FloatConsumer<T> {
-	final double destinationSampleRate;
+	final float destinationSampleRate;
 	final Accumulator<T>[] accs;
 
 	private static final class Accumulator<T extends Throwable> extends AccumulatorBase implements FloatConsumer<T> {
@@ -12,7 +12,7 @@ public class Downsampler<T extends Throwable> implements FloatConsumer<T> {
 		private float acc = 0f;
 		private float sum = 0f;
 
-		public Accumulator(final LanczosTable lanczos, final FloatConsumer<T> out, final float inPosition, final double inToOut) {
+		public Accumulator(final LanczosTable lanczos, final FloatConsumer<T> out, final float inPosition, final float inToOut) {
 			super(lanczos, inPosition, inToOut);
 			this.out = out;
 		}
@@ -33,15 +33,15 @@ public class Downsampler<T extends Throwable> implements FloatConsumer<T> {
 		}
 	}
 
-	public double getSampleRate() {
+	public float getSampleRate() {
 		return destinationSampleRate;
 	}
 
-	public Downsampler(final LanczosTable lanczos, final double sourceSampleRate, final double destinationSampleRate, final FloatConsumer<T> out) {
+	public Downsampler(final LanczosTable lanczos, final float sourceSampleRate, final float destinationSampleRate, final FloatConsumer<T> out) {
 		this.destinationSampleRate = destinationSampleRate;
 
 		int x = -2 * lanczos.A;
-		final double ratio = sourceSampleRate / destinationSampleRate;
+		final float ratio = sourceSampleRate / destinationSampleRate;
 		accs = new Accumulator[2 * lanczos.A];
 		for (int i = 0; i < 2 * lanczos.A; ++i) {
 			accs[i] = new Accumulator<>(lanczos, out, x++, ratio);

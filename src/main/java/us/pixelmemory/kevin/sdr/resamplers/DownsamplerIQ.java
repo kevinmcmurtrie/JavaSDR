@@ -5,7 +5,7 @@ import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 
 public class DownsamplerIQ<T extends Throwable> implements IQSampleConsumer<T> {
-	private final double destinationSampleRate;
+	private final float destinationSampleRate;
 	final Accumulator<T>[] accs;
 
 	private static final class Accumulator<T extends Throwable> extends AccumulatorBase implements IQSampleConsumer<T> {
@@ -41,15 +41,15 @@ public class DownsamplerIQ<T extends Throwable> implements IQSampleConsumer<T> {
 		}
 	}
 
-	public double getSampleRate() {
+	public float getSampleRate() {
 		return destinationSampleRate;
 	}
 
-	public DownsamplerIQ(final LanczosTable lanczos, final double sourceSampleRate, final double destinationSampleRate, final IQSampleConsumer<T> out) {
+	public DownsamplerIQ(final LanczosTable lanczos, final float sourceSampleRate, final float destinationSampleRate, final IQSampleConsumer<T> out) {
 		this.destinationSampleRate = destinationSampleRate;
 
 		int x = -2 * lanczos.A;
-		final float ratio = (float) (sourceSampleRate / destinationSampleRate);
+		final float ratio = sourceSampleRate / destinationSampleRate;
 		accs = new Accumulator[2 * lanczos.A];
 		for (int i = 0; i < 2 * lanczos.A; ++i) {
 			accs[i] = new Accumulator<>(lanczos, out, x++, ratio);

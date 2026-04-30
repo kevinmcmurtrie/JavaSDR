@@ -16,7 +16,8 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 	private static final long timeOutNanos = TimeUnit.SECONDS.toNanos(1);
 	private final IQSampleConsumer<T> out;
 	public final String name;
-	private final IQSample[] buffer;
+	private final float[] bufferI;
+	private final float[] bufferQ;
 	private volatile int nextInsert;
 	private volatile int lastConsumed;
 	private volatile Throwable err = null;
@@ -27,10 +28,8 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 	public IQSampleBufferThread(final int bufferSize, final String name, final IQSampleConsumer<T> out) {
 		this.name = name;
 		this.out = out;
-		buffer = new IQSample[bufferSize];
-		for (int i = 0; i < bufferSize; ++i) {
-			buffer[i] = new IQSample(0, 0);
-		}
+		bufferI = new float[bufferSize];
+		bufferQ = new float[bufferSize];
 		nextInsert = 0;
 		lastConsumed = bufferSize - 1;
 	}
@@ -44,7 +43,7 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 			while ((err == null) && (me == consumerThread.get())) {
 				int nextIdx;
 				while ((nextIdx = nextIdx(lastConsumed)) != nextInsert) {
-					iq.set(buffer[nextIdx]);
+					iq.set(bufferI[nextIdx], bufferQ[nextIdx]);
 					lastConsumed = nextIdx;
 					unblockWaitingProvider();
 					out.accept(iq);
@@ -98,7 +97,7 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 	}
 
 	private int nextIdx(final int idx) {
-		return (idx + 1) % buffer.length;
+		return (idx + 1) % bufferI.length;
 	}
 
 	private void unblockWaitingProvider() {
@@ -139,7 +138,8 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 		}
 
 		final int nextIdx = nextIdx(nextInsert);
-		buffer[nextIdx].set(iq);
+		bufferI[nextIdx]= iq.in;
+		bufferQ[nextIdx]= iq.quad;
 		nextInsert = nextIdx;
 
 		unblockWaitingConsumer();

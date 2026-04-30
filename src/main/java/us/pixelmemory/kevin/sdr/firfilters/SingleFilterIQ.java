@@ -20,8 +20,8 @@ public final class SingleFilterIQ implements IQSampleProcessor<RuntimeException>
 
 	@Override
 	public void accept(final IQSample in, final IQSample out) throws RuntimeException {
-		circBufI[pos] = (float) in.in;
-		circBufQ[pos] = (float) in.quad;
+		circBufI[pos] = in.in;
+		circBufQ[pos] = in.quad;
 		final int sampleIdx = (pos - sampleLatency) & (circBufI.length - 1);
 		out.set(filter.apply(circBufI, sampleIdx), filter.apply(circBufQ, sampleIdx));
 		pos = (pos + 1) & (circBufI.length - 1);

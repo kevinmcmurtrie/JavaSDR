@@ -115,9 +115,9 @@ public class IQVisualizer extends JPanel {
 	}
 
 	private static IQSample phase0 = new IQSample();
-	private static IQSample phase1 = new IQSample(Math.PI / 2);
-	private static IQSample phase2 = new IQSample(Math.PI);
-	private static IQSample phase3 = new IQSample(Math.PI + Math.PI / 2);
+	private static IQSample phase1 = new IQSample((float)Math.PI / 2);
+	private static IQSample phase2 = new IQSample((float)Math.PI);
+	private static IQSample phase3 = new IQSample((float)Math.PI + (float)Math.PI / 2);
 
 	private static Color marker0 = new Color(254, 254, 254);
 	private static Color markerQuads = new Color(50, 50, 50);
@@ -139,7 +139,7 @@ public class IQVisualizer extends JPanel {
 		syncColor.add(c);
 	}
 
-	public void drawAnalog(final Color c, final double v) {
+	public void drawAnalog(final Color c, final float v) {
 		final Point2D.Float previous = previousPoints.computeIfAbsent(c, x -> new Point2D.Float(0, 800));
 		boolean doSync = false;
 

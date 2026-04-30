@@ -13,11 +13,11 @@ public class FrequencyLock implements PhaseTunerLock {
 
 	// Previous - current is the frequency offset
 	private final IQSample previous = new IQSample();
-	private final double samplesPerCycle;
+	private final float samplesPerCycle;
 
 	// Need two AFT rates to dampen cycling (the parallel C and RC in every PLL)
-	private final double aftLimit;
-	private double frequencyAft = 0;
+	private final float aftLimit;
+	private float frequencyAft = 0;
 	private final Clock clock;
 	private float phaseOffset;
 
@@ -25,13 +25,13 @@ public class FrequencyLock implements PhaseTunerLock {
 
 	private final IQSample frequencyDetector = new IQSample();
 
-	public FrequencyLock(final double sampleRate, final double frequency, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
+	public FrequencyLock(final float sampleRate, final float frequency, final float aftFractionalSpeed, final float frequencyLimit, final boolean debug) {
 		clock= new Clock(sampleRate, frequency);
 		samplesPerCycle = sampleRate / frequency;
 		if (samplesPerCycle < 2) {
 			throw new IllegalArgumentException("sampleRate is too low");
 		}
-		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
+		final float tauCyclesPerSample = (float)(Math.TAU / samplesPerCycle);
 		this.aftLimit = frequencyLimit / tauCyclesPerSample;
 		this.debug = debug;
 		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
@@ -41,10 +41,10 @@ public class FrequencyLock implements PhaseTunerLock {
 		}
 	}
 
-	public FrequencyLock(final double sampleRate, final double aftFractionalSpeed, final double frequencyLimit, final boolean debug) {
+	public FrequencyLock(final float sampleRate, final float aftFractionalSpeed, final float frequencyLimit, final boolean debug) {
 		clock= new Clock(sampleRate, 0);
 		samplesPerCycle = 1;
-		final double tauCyclesPerSample = Math.TAU / samplesPerCycle;
+		final float tauCyclesPerSample = (float)(Math.TAU / samplesPerCycle);
 		this.aftLimit = frequencyLimit / tauCyclesPerSample;
 		this.debug = debug;
 		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
@@ -55,8 +55,8 @@ public class FrequencyLock implements PhaseTunerLock {
 	}
 	
 	public static void main (String args[]) throws Exception {
-		double sampleRate= 100000;
-		double frequency = 100;
+		float sampleRate= 100000;
+		float frequency = 100;
 		
 		FrequencyLock fl= new FrequencyLock(sampleRate, frequency, 1, 200, true);
 		Clock c = new Clock(sampleRate, frequency +50);
@@ -64,38 +64,37 @@ public class FrequencyLock implements PhaseTunerLock {
 		final IQSample out= new IQSample();
 		
 		for (int i= 0; i < 10000000; ++i) {
-			src.setMoment(c.getAndTick());
+			src.setMoment((float)c.getAndTick());
 			fl.accept(src, out);
 		}
 		
 	}
 
 	@Override
-	public double getClockRateAdjustment() {
+	public float getClockRateAdjustment() {
 		return frequencyAft;
 	}
 
 	@Override
 	public void accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		final double c= clock.getAndTick(frequencyAft);
-		out.rotate(-c);
+		out.rotate((float)(-clock.getAndTick(frequencyAft)));
 		
 		previous.conjugate();
 		previous.multiply(out);
-		phaseOffset= (float)previous.phase();
+		phaseOffset= previous.phase();
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
 		errorLowPass.accept(previous, frequencyDetector);
 		
 		//The frequency mismatch is noisy and only useful when the phase mismatch is zero magnitude.
-		final double frequencyMismatchPhase = frequencyDetector.phase();
+		final float frequencyMismatchPhase = frequencyDetector.phase();
 		
 		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
 		frequencyAft+= 0.00001d * frequencyMismatchPhase;
 		
-		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002);	//Debounce frequency correction with forward feedback
+		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002f);	//Debounce frequency correction with forward feedback
 		
 
 		if (frequencyAft > aftLimit) {
