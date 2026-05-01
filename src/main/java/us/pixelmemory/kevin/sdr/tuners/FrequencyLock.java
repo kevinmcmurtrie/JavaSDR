@@ -66,7 +66,7 @@ public class FrequencyLock implements PhaseTunerLock {
 
 		boolean speedToggle= false;
 		for (int i = 0; i < 10000000; ++i) {
-			src.setMoment((float) c.getAndTick(speedToggle ? 0.003d : -0.003d));
+			src.setMoment((float) c.tickAndGet(speedToggle ? 0.003d : -0.003d));
 			fl.accept(src, out);
 		
 			if (i % 2000 == 0) {
@@ -83,7 +83,7 @@ public class FrequencyLock implements PhaseTunerLock {
 	@Override
 	public void accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		out.rotate((float)(-clock.getAndTick(frequencyAft.getLastValue())));
+		out.rotate((float)(-clock.tickAndGet(frequencyAft.getLastValue())));
 		
 		previous.conjugate();
 		previous.multiply(out);

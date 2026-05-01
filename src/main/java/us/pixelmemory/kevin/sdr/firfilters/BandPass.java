@@ -38,8 +38,8 @@ public record BandPass(LanczosTable lanczos, float lowBand, float highBand) impl
 		final Clock c2 = new Clock(sampleRate, modFrequency);
 
 		for (int i = 0; i < 10000000; ++i) {
-			final float mod = (float) Math.cos(c2.getAndTick());
-			final float src = (float) Math.cos(c.getAndTick(modGain * mod));
+			final float mod = (float) Math.cos(c2.tickAndGet());
+			final float src = (float) Math.cos(c.tickAndGet(modGain * mod));
 
 			mf.accept(src, src, mod);
 			Thread.sleep(1);

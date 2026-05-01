@@ -24,7 +24,7 @@ public final class FrequencyShift{
 		final Clock clock= new Clock(sampleRate, frequency);
 		return (iqIn, iqOut) -> {
 			iqOut.set(iqIn);
-			iqOut.rotate((float)(clock.getAndTick()));
+			iqOut.rotate((float)(clock.tickAndGet()));
 		};
 	}
 	
@@ -33,7 +33,7 @@ public final class FrequencyShift{
 		final Clock clock= new Clock(sampleRate, frequency);
 		return (iqIn) -> {
 			iqOut.set(iqIn);
-			iqOut.rotate((float)(clock.getAndTick()));
+			iqOut.rotate((float)(clock.tickAndGet()));
 			out.accept(iqOut);
 		};
 	}
@@ -50,7 +50,7 @@ public final class FrequencyShift{
 		final IQSample out= new IQSample();
 		
 		for (int i= 0; i < 10000000; ++i) {
-			src.setMoment((float)c.getAndTick());
+			src.setMoment((float)c.tickAndGet());
 			fl.accept(src, out);
 			vis.drawIQ(Color.red, src);
 			vis.drawIQ(Color.blue, out);

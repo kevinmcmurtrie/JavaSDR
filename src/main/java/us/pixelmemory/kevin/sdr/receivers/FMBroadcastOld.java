@@ -33,7 +33,7 @@ public class FMBroadcastOld<T extends Throwable> implements FloatConsumer<T> {
 
 	
 	private static final float bandwidth= 16500f;
-	private static final float extraStereoGain= 2f;
+	private static final float extraStereoGain= 1.8f;
 	
 	// A higher Lanczos level on the pilot BandPass filter helps with stations that have strong noise or too small of a pilot guard.
 	// Too high of a level causes a false pilot made from pure noise.

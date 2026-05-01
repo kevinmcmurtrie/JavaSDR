@@ -25,16 +25,14 @@ public final class Clock {
 		return clock;
 	}
 	
-	public double getAndTick() {
-		final double c= clock;
+	public double tickAndGet() {
 		clockTick();
-		return c;
+		return clock;
 	}
 	
-	public double getAndTick(final double adjustment) {
-		final double c= clock;
+	public double tickAndGet(final double adjustment) {
 		clockTick(adjustment);
-		return c;
+		return clock;
 	}
 	
 	public void clockTick() {

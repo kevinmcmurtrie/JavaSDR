@@ -9,7 +9,7 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 
 public class PhaseLock implements PhaseTunerLock {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 	private static final boolean liveDebug = true;
 	private final boolean debug;
 	private final IQVisualizer vis;
@@ -83,7 +83,7 @@ public class PhaseLock implements PhaseTunerLock {
 
 		boolean speedToggle= false;
 		for (int i = 0; i < 10000000; ++i) {
-			src.setMoment((float) c.getAndTick(speedToggle ? 0.003d : -0.003d));
+			src.setMoment((float) c.tickAndGet(speedToggle ? 0.003d : -0.003d));
 			fl.accept(src, out);
 			if (i % 10 == 0) {
 				fl.vis.repaint();
@@ -104,7 +104,7 @@ public class PhaseLock implements PhaseTunerLock {
 	@Override
 	public void accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		out.rotate((float) (-clock.getAndTick(frequencyAft.getLastValue() + phaseAft)));
+		out.rotate((float) (-clock.tickAndGet(frequencyAft.getLastValue() + phaseAft)));
 
 		if (enableDebug && debug) {
 			if (liveDebug) {
