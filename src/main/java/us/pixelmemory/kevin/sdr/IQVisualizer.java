@@ -140,6 +140,9 @@ public class IQVisualizer extends JPanel {
 	}
 
 	public void drawAnalog(final Color c, final float v) {
+		if (!Float.isFinite(v)) {
+			throw new IllegalArgumentException ("Invalid analog sample: " + v);
+		}
 		final Point2D.Float previous = previousPoints.computeIfAbsent(c, x -> new Point2D.Float(0, 800));
 		boolean doSync = false;
 
@@ -170,6 +173,9 @@ public class IQVisualizer extends JPanel {
 	// Vertical = in, horizontal= quadrature
 	public void drawIQ(final Color c, final IQSample s) {
 		if (s != null) {
+			if (!Float.isFinite(s.in) || !Float.isFinite(s.in)) {
+				throw new IllegalArgumentException ("Invalid IQSample: " + s);
+			}
 			final int x = 500 + (int) (400 * s.in);
 			final int y = 500 - (int) (400 * s.quad);
 			imgG.setColor(c);

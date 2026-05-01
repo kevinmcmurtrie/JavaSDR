@@ -16,6 +16,9 @@ public final class RCLowPass implements FloatFunction<RuntimeException> {
 	}
 
 	public RCLowPass(final double ratio) {
+		if (ratio == 0d) {
+			throw new IllegalArgumentException("Zero ratio");
+		}
 		this.ratio = ratio;
 	}
 	
@@ -45,5 +48,14 @@ public final class RCLowPass implements FloatFunction<RuntimeException> {
 	public float apply(final float f) throws RuntimeException {
 		acc += (f - acc) / ratio;
 		return (float) acc;
+	}
+	
+	public float integrate(final float f) throws RuntimeException {
+		acc += f / ratio;
+		return (float) acc;
+	}
+	
+	public float getLastValue() {
+		return (float)acc;
 	}
 }

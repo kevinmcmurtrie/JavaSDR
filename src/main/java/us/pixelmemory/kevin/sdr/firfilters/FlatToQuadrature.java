@@ -1,0 +1,63 @@
+package us.pixelmemory.kevin.sdr.firfilters;
+
+import java.awt.Color;
+
+import us.pixelmemory.kevin.sdr.FloatConsumer;
+import us.pixelmemory.kevin.sdr.IQSample;
+import us.pixelmemory.kevin.sdr.IQSampleConsumer;
+import us.pixelmemory.kevin.sdr.IQVisualizer;
+
+/**
+ * Converts a fixed frequency signal to a dual frequency in IQ format by leaving the quadrature 0.
+ * This can be converted to a real IQ with a large frequency shift and low-pass.
+ */
+public final class FlatToQuadrature {
+	public FlatToQuadrature() {
+	}
+
+	public void convert(final float f, IQSample out) {
+		out.set(f, 0);
+	}
+
+	public <T extends Throwable> FloatConsumer<T> asConsumer(final IQSampleConsumer<T> out) {
+		final IQSample iqOut = new IQSample();
+		return (f) -> {
+			convert(f, iqOut);
+			out.accept(iqOut);
+		};
+	}
+
+	public static void main(String args[]) throws InterruptedException {
+		final IQVisualizer vis = new IQVisualizer();
+
+		final float sampleRate = 400000.0f;
+		final float frequency = 19000;
+		final float amFrequency = 20000;
+
+		FlatToQuadrature ts = new FlatToQuadrature();
+
+		final float tauCyclesPerSample = (float) (frequency * Math.TAU / sampleRate);
+		final float amTauCyclesPerSample = (float) (amFrequency * Math.TAU / sampleRate);
+
+		IQSample iq = new IQSample();
+		IQSample fakeIq = new IQSample();
+
+		for (int i = 0; i < 10000; ++i) {
+			float c = i * tauCyclesPerSample;
+			float am = i * amTauCyclesPerSample;
+
+			iq.setMoment(c);
+			iq.multiply(0.5f + 0.1f * (float) Math.sin(am));
+			ts.convert(iq.in, fakeIq);
+
+			vis.fade();
+			vis.drawIQ(Color.red, iq);
+			vis.drawIQ(Color.green, fakeIq);
+
+			fakeIq.rotate(-c);
+			vis.drawIQ(Color.blue, fakeIq);
+			vis.repaint();
+			Thread.sleep(10);
+		}
+	}
+}

@@ -34,16 +34,19 @@ public final class TimeShiftToQuadrature {
 		if (delayIdx1 < 0) {
 			delayIdx1 += circBuffer.length;
 		}
+				
 		pos++;
 		if (pos >= circBuffer.length) {
 			pos -= circBuffer.length;
 		}
+		
 		int delayIdx0 = pos - sampleDelay;
 		if (delayIdx0 < 0) {
 			delayIdx0 += circBuffer.length;
 		}
 		
-		out.set(f, (splitweight * circBuffer[delayIdx1] + (1 - splitweight) * circBuffer[delayIdx0]));
+		final float delayed= splitweight * circBuffer[delayIdx1] + (1 - splitweight) * circBuffer[delayIdx0];
+		out.set(f, delayed);
 		circBuffer[pos] = f;
 	}
 	
@@ -60,24 +63,31 @@ public final class TimeShiftToQuadrature {
 
 		final float sampleRate = 400000.0f;
 		final float frequency = 19000;
-
+		final float amFrequency = 20000;
+		
 		TimeShiftToQuadrature ts = new TimeShiftToQuadrature(sampleRate, frequency);
 
 		final float tauCyclesPerSample = (float)(frequency * Math.TAU / sampleRate);
+		final float amTauCyclesPerSample = (float)(amFrequency * Math.TAU / sampleRate);
 
 		IQSample iq = new IQSample();
 		IQSample fakeIq = new IQSample();
 
 		for (int i = 0; i < 10000; ++i) {
 			float c = i * tauCyclesPerSample;
+			float am= i * amTauCyclesPerSample;
+			
 			iq.setMoment(c);
+			iq.multiply(0.5f + 0.1f*(float)Math.sin(am));
 			ts.convert(iq.in, fakeIq);
 
 			vis.fade();
 			vis.drawIQ(Color.red, iq);
+			vis.drawIQ(Color.green, fakeIq);
+			
+			fakeIq.rotate(-c);
 			vis.drawIQ(Color.blue, fakeIq);
 			vis.repaint();
-
 			Thread.sleep(10);
 		}
 	}

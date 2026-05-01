@@ -16,8 +16,8 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 	private static final long timeOutNanos = TimeUnit.SECONDS.toNanos(1);
 	private final IQSampleConsumer<T> out;
 	public final String name;
-	private final float[] bufferI;
-	private final float[] bufferQ;
+	private final float[] bufferIQ;
+	private final int length;
 	private volatile int nextInsert;
 	private volatile int lastConsumed;
 	private volatile Throwable err = null;
@@ -28,8 +28,8 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 	public IQSampleBufferThread(final int bufferSize, final String name, final IQSampleConsumer<T> out) {
 		this.name = name;
 		this.out = out;
-		bufferI = new float[bufferSize];
-		bufferQ = new float[bufferSize];
+		bufferIQ = new float[2*bufferSize];
+		length= bufferSize;
 		nextInsert = 0;
 		lastConsumed = bufferSize - 1;
 	}
@@ -43,7 +43,7 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 			while ((err == null) && (me == consumerThread.get())) {
 				int nextIdx;
 				while ((nextIdx = nextIdx(lastConsumed)) != nextInsert) {
-					iq.set(bufferI[nextIdx], bufferQ[nextIdx]);
+					iq.set(bufferIQ[2*nextIdx], bufferIQ[1+2*nextIdx]);
 					lastConsumed = nextIdx;
 					unblockWaitingProvider();
 					out.accept(iq);
@@ -97,7 +97,7 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 	}
 
 	private int nextIdx(final int idx) {
-		return (idx + 1) % bufferI.length;
+		return (idx + 1) % length;
 	}
 
 	private void unblockWaitingProvider() {
@@ -130,7 +130,7 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 				throw new IllegalStateException("Multiple concurrent writer threads");
 			}
 			unblockWaitingConsumer();
-			LockSupport.park(cThread);
+			LockSupport.parkNanos(cThread, timeOutNanos);
 			waitingSupplierThread.compareAndSet(me, null);
 			// System.out.println("Wait for consumption - resume");
 
@@ -138,8 +138,8 @@ public class IQSampleBufferThread<T extends Throwable> implements IQSampleConsum
 		}
 
 		final int nextIdx = nextIdx(nextInsert);
-		bufferI[nextIdx]= iq.in;
-		bufferQ[nextIdx]= iq.quad;
+		bufferIQ[2*nextIdx]= iq.in;
+		bufferIQ[1+2*nextIdx]= iq.quad;
 		nextInsert = nextIdx;
 
 		unblockWaitingConsumer();

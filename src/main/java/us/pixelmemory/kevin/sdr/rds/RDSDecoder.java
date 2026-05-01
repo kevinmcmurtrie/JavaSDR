@@ -7,10 +7,10 @@ import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.SimplerMath;
+import us.pixelmemory.kevin.sdr.firfilters.FlatToQuadrature;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.SingleFilterIQ;
-import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIQ;
 import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIdentifier;
@@ -24,21 +24,20 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	public static final float rdsFrequency = 57000f;
 	private static final boolean debugVisualEnable = false;
 	private static final boolean debugDecodeEnable = true;
+	private static final boolean liveDebug = true;
+
 	private static final float rdsRate = 1187.5f; // This is the data rate. The encoding is double-rate.
 	private static final float intermediateFrequency1 = 19000f; //PLL, filtering
 	private static final int digitalOversample = 8;
 	private static final float intermediateFrequency2 = rdsRate * digitalOversample; //Manchester decoder
 	private final DownsamplerIdentifier<RuntimeException> secondDownsample;
 
-	private final IQSampleConsumer<RuntimeException> frequencyShiftTuner;
-
-	private final DownsamplerIQ<RuntimeException> firstDownsample;
 	private final SingleFilterIQ bandpass;
 	private final PhaseLock pskTuner;
 	private final IQSample bandpassIQ = new IQSample();
 	private final IQSample tunerIQ = new IQSample();
 	private final DifferentialManchesterDecoder<RuntimeException> diffManchesterDecoder;
-	private final FloatConsumer<RuntimeException> toQuadrature;
+	private final FloatConsumer<RuntimeException> inputProcessor;
 	private final RCLowPass gainLowPass;
 
 	private int register = 0; // 26 bits, 16 data + 10 CRC
@@ -56,24 +55,25 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	private final ProgramInformation programInfo = new ProgramInformation();
 
 	private final IQVisualizer vis;
-
+	
 	public RDSDecoder(final float sampleRate) {
 		// Step 3. Downsample to the first intermediate frequency.
-		firstDownsample = new DownsamplerIQ<>(LanczosTable.of(3), sampleRate, intermediateFrequency1, this::acceptIntermediateFrequency);
+		final DownsamplerIQ<RuntimeException> firstDownsample = new DownsamplerIQ<>(LanczosTable.of(3), sampleRate, intermediateFrequency1, this::acceptIntermediateFrequency);
 		
 		// Step 2. Shift 57kHz +/- 2kHz to 0Hz +/- 2KHz. There's no phase lock yet.  Feed to the downsampler.
-		frequencyShiftTuner = new FrequencyShift (sampleRate, -rdsFrequency).asConsumer(firstDownsample); // 57kHz -> 0Hz
+		final IQSampleConsumer<RuntimeException> frequencyShiftTuner = new FrequencyShift (sampleRate, -rdsFrequency).asConsumer(firstDownsample); // 57kHz -> 0Hz
 		
 		// Step 1. Fake an IQ sample from the 57kHz narrowband signal
-		toQuadrature= new TimeShiftToQuadrature(sampleRate, rdsFrequency).asConsumer(frequencyShiftTuner);
+		//inputProcessor= new TimeShiftToQuadrature(sampleRate, rdsFrequency).asConsumer(frequencyShiftTuner);
+		inputProcessor= new FlatToQuadrature().asConsumer(frequencyShiftTuner);
 
 
-		// Step 4. Narrow lowpass the first intermediate frequency to preserve slight +/- deviations from 0Hz.
-		bandpass = new SingleFilterIQ(intermediateFrequency1, new LowPass(LanczosTable.of(64), 1.65f * rdsRate)); 
+		// Step 4. Narrow lowpass the first intermediate frequency to preserve slight +/- deviations from 0Hz.  1.8
+		bandpass = new SingleFilterIQ(intermediateFrequency1, new LowPass(LanczosTable.of(64), 1.9f*rdsRate)); 
 
 		// Step 5. Decode the binary phase shift keying (BPSK) into 0 and 1.
 		// There's a big frequency downshift so it's unstable.
-		pskTuner= new PhaseLock (intermediateFrequency1, 1f, 20, 2, debugVisualEnable);
+		pskTuner= new PhaseLock (intermediateFrequency1, 1f, 4, 2, debugVisualEnable);
 
 		// Step 6. Downsample the 0 and 1 stream to debounce edge transitions.
 		secondDownsample = new DownsamplerIdentifier<>(LanczosTable.of(4), intermediateFrequency1, intermediateFrequency2, this::acceptDownsampled);
@@ -82,11 +82,11 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 		diffManchesterDecoder = new DifferentialManchesterDecoder<>(digitalOversample, true, this::acceptBinaryBit);
 
 		vis = debugVisualEnable ? new IQVisualizer() : null;
-		if (debugVisualEnable) {
+		if (debugVisualEnable && !liveDebug) {
 			vis.syncOnColor(Color.green);
 		}
 		
-		gainLowPass = new RCLowPass(intermediateFrequency1, 1);
+		gainLowPass = new RCLowPass(intermediateFrequency1, 10*rdsRate);
 	}
 
 	/**
@@ -97,7 +97,7 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	public void accept(final float f) {
 		// This isn't quite legit because it's going to fake the quadrature phase from a phase shift signal.
 		// A high sample rate helps make the phase shift signal smaller.
-		toQuadrature.accept(f);
+		inputProcessor.accept(f);
 	}
 
 	/**
@@ -107,8 +107,14 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 * @param iq
 	 */
 	void acceptIntermediateFrequency(final IQSample iq) {
+//		try {
+//			Thread.sleep(10);
+//		} catch (InterruptedException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 		bandpass.accept(iq, bandpassIQ);
-		bandpassIQ.multiply(SimplerMath.clamp(1f/gainLowPass.apply(bandpassIQ.magnitude()), 0.1f, 100f));
+		bandpassIQ.multiply(0.04f * SimplerMath.clamp(1f/gainLowPass.apply(bandpassIQ.magnitude()), 0.001f, 1000f));
 		pskTuner.accept(bandpassIQ, tunerIQ);
 		secondDownsample.accept(pskTuner.getLastPoint());
 	}
@@ -135,6 +141,10 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 		if (debugVisualEnable) {
 			for (int i = 0; i < digitalOversample; ++i) {
 				vis.drawAnalog(Color.green, value ? 4.5f : 4);
+			}
+			if (liveDebug) {
+				vis.repaint();
+				vis.fadeLight();
 			}
 		}
 		// Load up the register

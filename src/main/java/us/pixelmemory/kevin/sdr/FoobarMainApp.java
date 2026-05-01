@@ -27,8 +27,8 @@ import us.pixelmemory.kevin.sdr.tuners.FrequencyLock;
 public class FoobarMainApp {
 
 	public static void main(String[] args) throws InterruptedException, UnsupportedAudioFileException, IOException, LineUnavailableException {
-		final float IQGain = 10f;
-		final float targetSampleRate= RDSDecoder.rdsFrequency * 5; //FIXME
+		final float IQGain = 30f;
+		final float targetSampleRate= 270000f;
 		final String music= "/home/mcmurtri/SDR/SDRconnect_IQ_20250211_155243_98500000HZ.wav"; //Trash pilot
 		final String talk= "/home/mcmurtri/SDR/SDRconnect_IQ_20250214_122829_105700000HZ.wav"; //Super clean.  PI=0x499B
 		final String demo= "/home/mcmurtri/SDR/SDRuno_20200907_184033Z_88110kHz.wav"; //Off-center pilot
@@ -45,7 +45,7 @@ public class FoobarMainApp {
 		
 		
 		
-		final String theFile= talk;
+		final String theFile= punk;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {
@@ -76,13 +76,13 @@ public class FoobarMainApp {
 			RDSDecoder rds= new RDSDecoder (sampleRate);
 			FMBroadcastOld<RuntimeException> stereo= new FMBroadcastOld<>(sampleRate, audioSampler, rds);
 			
-			final FrequencyLock aft= new FrequencyLock(sampleRate, 10, 1000f, true);
+			final FrequencyLock aft= new FrequencyLock(sampleRate, 0.1f, 1000f, true);
 
 			IQSample tuned = new IQSample();
 			final float gain= sampleRate/(2*targetSampleRate);
 			IQSampleConsumer<RuntimeException> fmDemod = iq -> {aft.accept(iq, tuned);stereo.accept(aft.getPhase()*gain);};
 			
-			IQSampleConsumer<RuntimeException> sink= intermediateResample ? new DownsamplerIQ<>(LanczosTable.of(3), rawSampleRate, sampleRate, new IQSampleBufferThread<>(2048, "First DS", fmDemod)) : fmDemod;
+			IQSampleConsumer<RuntimeException> sink= intermediateResample ? new DownsamplerIQ<>(LanczosTable.of(6), rawSampleRate, sampleRate, new IQSampleBufferThread<>(2048, "First DS", fmDemod)) : fmDemod;
 		
 
 			IQSample iq = new IQSample();

@@ -4,10 +4,12 @@ import java.awt.Color;
 
 import us.pixelmemory.kevin.sdr.IQSample;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
-import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
+import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
 
 public class FrequencyLock implements PhaseTunerLock {
 	private static final boolean enableDebug = false;
+	private static final boolean liveDebug = true;
+
 	private final boolean debug;
 	private final IQVisualizer vis;
 
@@ -17,13 +19,13 @@ public class FrequencyLock implements PhaseTunerLock {
 
 	// Need two AFT rates to dampen cycling (the parallel C and RC in every PLL)
 	private final float aftLimit;
-	private float frequencyAft = 0;
 	private final Clock clock;
 	private float phaseOffset;
 
-	private final RCLowPassIQ errorLowPass;
-
-	private final IQSample frequencyDetector = new IQSample();
+	private final RCLowPass frequencyAft;
+	
+	private double avgNegDebug= 0d;
+	private double avgPosDebug= 0d;
 
 	public FrequencyLock(final float sampleRate, final float frequency, final float aftFractionalSpeed, final float frequencyLimit, final boolean debug) {
 		clock= new Clock(sampleRate, frequency);
@@ -31,12 +33,11 @@ public class FrequencyLock implements PhaseTunerLock {
 		if (samplesPerCycle < 2) {
 			throw new IllegalArgumentException("sampleRate is too low");
 		}
-		final float tauCyclesPerSample = (float)(Math.TAU / samplesPerCycle);
-		this.aftLimit = frequencyLimit / tauCyclesPerSample;
+		aftLimit = (float) (frequencyLimit * Math.TAU / sampleRate);
 		this.debug = debug;
-		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
+		frequencyAft = new RCLowPass(sampleRate, 1 / aftFractionalSpeed);
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
-		if (enableDebug && debug) {
+		if (enableDebug && !liveDebug && debug)  {
 			vis.syncOnColor(Color.orange);
 		}
 	}
@@ -44,41 +45,45 @@ public class FrequencyLock implements PhaseTunerLock {
 	public FrequencyLock(final float sampleRate, final float aftFractionalSpeed, final float frequencyLimit, final boolean debug) {
 		clock= new Clock(sampleRate, 0);
 		samplesPerCycle = 1;
-		final float tauCyclesPerSample = (float)(Math.TAU / samplesPerCycle);
-		this.aftLimit = frequencyLimit / tauCyclesPerSample;
+		aftLimit = (float) (frequencyLimit * Math.TAU / sampleRate);
 		this.debug = debug;
-		errorLowPass = new RCLowPassIQ(sampleRate, 1 / aftFractionalSpeed);
+		frequencyAft = new RCLowPass(sampleRate, 1 / aftFractionalSpeed);
 		vis = (enableDebug && debug) ? new IQVisualizer() : null;
-		if (enableDebug && debug) {
+		if (enableDebug && !liveDebug && debug)  {
 			vis.syncOnColor(Color.cyan);
 		}
 	}
 	
-	public static void main (String args[]) throws Exception {
-		float sampleRate= 100000;
-		float frequency = 100;
-		
-		FrequencyLock fl= new FrequencyLock(sampleRate, frequency, 1, 200, true);
-		Clock c = new Clock(sampleRate, frequency +50);
-		final IQSample src= new IQSample();
-		final IQSample out= new IQSample();
-		
-		for (int i= 0; i < 10000000; ++i) {
-			src.setMoment((float)c.getAndTick());
+	public static void main(String args[]) throws Exception {
+		float sampleRate = 200000;
+		float frequency = 10000;
+
+		FrequencyLock fl = new FrequencyLock(sampleRate, frequency, 1f, 10000f, true);
+		fl.vis.syncOnColor(new Color(1, 2, 3));
+		Clock c = new Clock(sampleRate, frequency);
+		final IQSample src = new IQSample();
+		final IQSample out = new IQSample();
+
+		boolean speedToggle= false;
+		for (int i = 0; i < 10000000; ++i) {
+			src.setMoment((float) c.getAndTick(speedToggle ? 0.003d : -0.003d));
 			fl.accept(src, out);
-		}
 		
+			if (i % 2000 == 0) {
+				speedToggle= !speedToggle;
+			}
+		}
 	}
 
 	@Override
 	public float getClockRateAdjustment() {
-		return frequencyAft;
+		return (float)(samplesPerCycle * frequencyAft.getLastValue() / Math.TAU);
 	}
 
 	@Override
 	public void accept(final IQSample src, final IQSample out) {
 		out.set(src);
-		out.rotate((float)(-clock.getAndTick(frequencyAft)));
+		out.rotate((float)(-clock.getAndTick(frequencyAft.getLastValue())));
 		
 		previous.conjugate();
 		previous.multiply(out);
@@ -86,42 +91,44 @@ public class FrequencyLock implements PhaseTunerLock {
 
 		// Average in two dimensions using an IQ sample. This tolerates high levels of noise and moments of negative
 		// amplitude. If phase detection comes before averaging, noise dominates so much that it doesn't average out.
-		errorLowPass.accept(previous, frequencyDetector);
-		
-		//The frequency mismatch is noisy and only useful when the phase mismatch is zero magnitude.
-		final float frequencyMismatchPhase = frequencyDetector.phase();
-		
-		// Fast adjustments to the phase. This adjustment is consumed to prevent bouncing.
-		frequencyAft+= 0.00001d * frequencyMismatchPhase;
-		
-		frequencyDetector.rotate(-frequencyMismatchPhase*0.000002f);	//Debounce frequency correction with forward feedback
-		
 
-		if (frequencyAft > aftLimit) {
-			if (enableDebug) {
-				System.out.println("AFT limit: " + frequencyAft);
-			}
-			frequencyAft = aftLimit;
+		float aft= frequencyAft.integrate(phaseOffset/ samplesPerCycle);
+		
+		
+		if (phaseOffset < 0) {
+			avgNegDebug += (phaseOffset - avgNegDebug) / 1000d;
+		} else if (phaseOffset > 0) {
+			avgPosDebug += (phaseOffset - avgPosDebug) / 1000d;
 		}
-		if (frequencyAft < -aftLimit) {
+//		System.out.println (avgNegDebug + " \t" + avgPosDebug + " \t" + frequencyDetector);
+
+		if (aft > aftLimit) {
 			if (enableDebug) {
-				System.out.println("AFT limit: " + frequencyAft);
+				System.out.println("AFT limit: " + aft);
 			}
-			frequencyAft = -aftLimit;
+			frequencyAft.setValue(aftLimit);
+		}
+		if (aft < -aftLimit) {
+			if (enableDebug) {
+				System.out.println("AFT limit: " + aft);
+			}
+			frequencyAft.setValue(-aftLimit);
 		}
 
 		if (enableDebug && debug) {
+			if (liveDebug) {
+				vis.fadeLight();
+			}
 			vis.markCenter();
 			vis.drawIQ(Color.red, src);
 			vis.drawAnalog(Color.gray, 0);
-			vis.drawAnalog(Color.cyan, samplesPerCycle * frequencyAft);
+			vis.drawAnalog(Color.cyan, (float)(100*samplesPerCycle * aft));
 			vis.drawAnalog(Color.orange, phaseOffset * samplesPerCycle);
-
-			vis.drawIQ(Color.magenta, frequencyDetector);
 			vis.drawIQ(Color.blue, out);
 
-//			vis.repaint();// only interactive debugging
-//			vis.fadeLight();
+			if (liveDebug) {
+				vis.repaint();
+			}
 		}
 		previous.set(out);
 	}
