@@ -13,23 +13,27 @@ import us.pixelmemory.kevin.sdr.IQVisualizer;
  * <br>
  * Used to find constant frequency pilot carriers inside another signal.
  */
-public final class TimeShiftToQuadrature {
+public final class QuarterWaveDelay {
 	private final float circBuffer[];
 	private int pos = 0;
 	private int sampleDelay;
 	private float splitweight;
 
-	public TimeShiftToQuadrature(final float sampleRate, final float frequency) {
+	public QuarterWaveDelay(final float sampleRate, final float frequency) {
 		this(sampleRate / (4f * frequency));
 	}
 
-	public TimeShiftToQuadrature(final float sampleDelay) {
+	public QuarterWaveDelay(final float sampleDelay) {
 		this.sampleDelay = (int) sampleDelay;
 		circBuffer = new float[1 + this.sampleDelay];
 		splitweight = sampleDelay - this.sampleDelay;
 	}
 
 	public void convert(final float f, IQSample out) {
+		out.set(f, delay(f));
+	}
+	
+	public float delay (float f) {
 		int delayIdx1 = pos - sampleDelay;
 		if (delayIdx1 < 0) {
 			delayIdx1 += circBuffer.length;
@@ -46,8 +50,8 @@ public final class TimeShiftToQuadrature {
 		}
 		
 		final float delayed= splitweight * circBuffer[delayIdx1] + (1 - splitweight) * circBuffer[delayIdx0];
-		out.set(f, delayed);
 		circBuffer[pos] = f;
+		return delayed;
 	}
 	
 	public  <T extends Throwable> FloatConsumer<T> asConsumer (final IQSampleConsumer<T> out) {
@@ -65,7 +69,7 @@ public final class TimeShiftToQuadrature {
 		final float frequency = 19000;
 		final float amFrequency = 20000;
 		
-		TimeShiftToQuadrature ts = new TimeShiftToQuadrature(sampleRate, frequency);
+		QuarterWaveDelay ts = new QuarterWaveDelay(sampleRate, frequency);
 
 		final float tauCyclesPerSample = (float)(frequency * Math.TAU / sampleRate);
 		final float amTauCyclesPerSample = (float)(amFrequency * Math.TAU / sampleRate);

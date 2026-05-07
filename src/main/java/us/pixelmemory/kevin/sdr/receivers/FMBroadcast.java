@@ -13,7 +13,7 @@ import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.MultiFilter;
 import us.pixelmemory.kevin.sdr.firfilters.SingleFilter;
-import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
+import us.pixelmemory.kevin.sdr.firfilters.QuarterWaveDelay;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassStereo;
 import us.pixelmemory.kevin.sdr.rds.RDSDecoder;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
@@ -47,7 +47,7 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 	private static final FilterBuilder audioFilter = new LowPass(LanczosTable.of(6), bandwidth);
 
 	private final RCLowPassStereo<T> deEmphasis;
-	private final TimeShiftToQuadrature pilotQuad;
+	private final QuarterWaveDelay pilotQuad;
 	private final IQVisualizer vis = enableDebug ? new IQVisualizer(2f) : null;
 
 	public FMBroadcast(float radioSampleRate, float radioTuningOffsetFrequency, float radioAFTRange, FloatPairConsumer<T> audioOutput, float audioSampleRate, float bandwidth, boolean debug) {
@@ -57,7 +57,7 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 		sourceMultiFilter = new MultiFilter<>(radioSampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3]), stereoPilotFilter, monoBandFilter, stereoBandFilter, rdsBandFilter);
 		audioLeftFilter= new SingleFilter(radioSampleRate,audioFilter);
 		audioRightFilter= new SingleFilter(radioSampleRate,audioFilter);
-		pilotQuad= new TimeShiftToQuadrature(radioSampleRate, pilotFrequency);
+		pilotQuad= new QuarterWaveDelay(radioSampleRate, pilotFrequency);
 		initialGain= radioSampleRate/360000;
 		if (enableDebug) {
 			vis.syncOnColor(Color.gray);
@@ -73,7 +73,7 @@ public class FMBroadcast<T extends Throwable> implements FloatConsumer<T> {
 		final float doubleClock = (float) Math.sin(2 * pilotTuner.getClock());
 		final float stereo= stereoStrength * extraStereoGain * stereoBand * doubleClock; // L-R
 
-		rds.accept(rdsBand);
+		rds.accept(rdsBand, pilotTuner.getClock());
 		
 		
 		final float left= audioLeftFilter.apply(monoBand + stereo);

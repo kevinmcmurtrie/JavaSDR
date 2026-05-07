@@ -13,8 +13,9 @@ import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
 import us.pixelmemory.kevin.sdr.firfilters.MultiFilter;
 import us.pixelmemory.kevin.sdr.firfilters.SingleFilter;
-import us.pixelmemory.kevin.sdr.firfilters.TimeShiftToQuadrature;
+import us.pixelmemory.kevin.sdr.firfilters.QuarterWaveDelay;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassStereo;
+import us.pixelmemory.kevin.sdr.rds.RDSDecoder;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
 
 public class FMBroadcastOld<T extends Throwable> implements FloatConsumer<T> {
@@ -28,11 +29,11 @@ public class FMBroadcastOld<T extends Throwable> implements FloatConsumer<T> {
 	private final MultiFilter<T> sourceMultiFilter;
 	private final SingleFilter audioLeftFilter;
 	private final SingleFilter audioRightFilter;
-	private final FloatConsumer<T> rdsOut;
+	private final RDSDecoder rdsOut;
 	private final float initialGain;
 
 	
-	private static final float bandwidth= 16500f;
+	private static final float bandwidth= 16500f;  //15kHz or 16.5kHz maximum.
 	private static final float extraStereoGain= 1.8f;
 	
 	// A higher Lanczos level on the pilot BandPass filter helps with stations that have strong noise or too small of a pilot guard.
@@ -45,16 +46,16 @@ public class FMBroadcastOld<T extends Throwable> implements FloatConsumer<T> {
 	private static final FilterBuilder audioFilter = new LowPass(LanczosTable.of(6), bandwidth);
 
 	private final RCLowPassStereo<T> deEmphasis;
-	private final TimeShiftToQuadrature pilotQuad;
+	private final QuarterWaveDelay pilotQuad;
 	private final IQVisualizer vis = enableDebug ? new IQVisualizer(2f) : null;
 
-	public FMBroadcastOld(final float sampleRate, final FloatPairConsumer<T> stereoOut, final FloatConsumer<T> rdsOut) {
+	public FMBroadcastOld(final float sampleRate, final FloatPairConsumer<T> stereoOut, final RDSDecoder rdsOut) {
 		deEmphasis = new RCLowPassStereo<>(sampleRate, 0.000075d, stereoOut);
 		pilotTuner = new PhaseLock(sampleRate, pilotFrequency, 0.5f, 50f, 0, enableDebug);
 		sourceMultiFilter = new MultiFilter<>(sampleRate, f -> bandpassIn(f[0], f[1], f[2], f[3]), stereoPilotFilter, monoBandFilter, stereoBandFilter, rdsBandFilter);
 		audioLeftFilter= new SingleFilter(sampleRate,audioFilter);
 		audioRightFilter= new SingleFilter(sampleRate,audioFilter);
-		pilotQuad= new TimeShiftToQuadrature(sampleRate, pilotFrequency);
+		pilotQuad= new QuarterWaveDelay(sampleRate, pilotFrequency);
 		this.rdsOut = rdsOut;
 		initialGain= sampleRate/360000;
 		if (enableDebug) {
@@ -69,11 +70,11 @@ public class FMBroadcastOld<T extends Throwable> implements FloatConsumer<T> {
 		// Calculate the strength of the stereo and scale it gradually. It will naturally fade in and out on weak signals.
 		final float stereoStrength = pilotTuner.getLockQuality();
 		final float doubleClock = (float) Math.sin(2 * pilotTuner.getClock());
+		
 		final float stereo= stereoStrength * extraStereoGain * stereoBand * doubleClock; // L-R
 
 		if (rdsOut != null) {
-			// It would be nice to use the 3*pilot to demodulate RDS, but stations violate the requirement that it be in sync.
-			rdsOut.accept(rdsBand);
+			rdsOut.accept(rdsBand, pilotTuner.getClock());
 		}
 		
 		final float left= audioLeftFilter.apply(monoBand + stereo);

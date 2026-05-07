@@ -151,7 +151,7 @@ public class IQVisualizer extends JPanel {
 			x = 0;
 			doSync = syncColor.contains(c);
 		}
-		final int y = (int) (800 - (v * 100));
+		final int y = SimplerMath.clamp((int) (800 - (v * 100)), 0, img.getHeight()-1);
 
 		imgG.setColor(c);
 		if (previous.x < x) {
@@ -176,8 +176,8 @@ public class IQVisualizer extends JPanel {
 			if (!Float.isFinite(s.in) || !Float.isFinite(s.in)) {
 				throw new IllegalArgumentException ("Invalid IQSample: " + s);
 			}
-			final int x = 500 + (int) (400 * s.in);
-			final int y = 500 - (int) (400 * s.quad);
+			final int x = SimplerMath.clamp(500 + (int) (400 * s.in), 0, img.getWidth()-8);
+			final int y = SimplerMath.clamp(500 - (int) (400 * s.quad), 0, img.getHeight()-8);
 			imgG.setColor(c);
 			imgG.fillOval(x, y, 9, 9);
 			final Point2D.Float previous = previousPoints.get(c);

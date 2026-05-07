@@ -21,37 +21,35 @@ public final class Clock {
 		}
 	}
 	
-	public double getClock() {
-		return clock;
-	}
-	
 	public double tickAndGet() {
 		clockTick();
-		return clock;
+		return getClock();
 	}
 	
 	public double tickAndGet(final double adjustment) {
 		clockTick(adjustment);
+		return getClock();
+	}
+	
+	public double getClock() {
 		return clock;
 	}
 	
 	public void clockTick() {
-		clock += tauPerSample;
-		if (clock > Math.PI) {
-			clock -= Math.TAU;
-		}
-		if (clock < -Math.PI) {
-			clock += Math.TAU;
-		}
+		clock = wrapClock(clock + tauPerSample);
+	}
+
+	public void clockTick(final double adjustment) {
+		clock = wrapClock(clock + tauPerSample + adjustment);
 	}
 	
-	public void clockTick(final double adjustment) {
-		clock += tauPerSample + adjustment;
+	public static double wrapClock (double clock) {
 		if (clock > Math.PI) {
-			clock -= Math.TAU;
+			return clock - Math.TAU;
 		}
 		if (clock < -Math.PI) {
-			clock += Math.TAU;
+			return clock + Math.TAU;
 		}
+		return clock;
 	}
 }

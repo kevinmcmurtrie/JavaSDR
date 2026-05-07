@@ -9,7 +9,7 @@ import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPassIQ;
 
 public class PhaseLock implements PhaseTunerLock {
-	private static final boolean enableDebug = false;
+	private static final boolean enableDebug = true;
 	private static final boolean liveDebug = true;
 	private final boolean debug;
 	private final IQVisualizer vis;

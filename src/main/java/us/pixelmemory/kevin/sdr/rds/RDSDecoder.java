@@ -2,43 +2,42 @@ package us.pixelmemory.kevin.sdr.rds;
 
 import java.awt.Color;
 
-import us.pixelmemory.kevin.sdr.FloatConsumer;
-import us.pixelmemory.kevin.sdr.IQSample;
-import us.pixelmemory.kevin.sdr.IQSampleConsumer;
 import us.pixelmemory.kevin.sdr.IQVisualizer;
 import us.pixelmemory.kevin.sdr.SimplerMath;
-import us.pixelmemory.kevin.sdr.firfilters.FlatToQuadrature;
 import us.pixelmemory.kevin.sdr.firfilters.LanczosTable;
 import us.pixelmemory.kevin.sdr.firfilters.LowPass;
-import us.pixelmemory.kevin.sdr.firfilters.SingleFilterIQ;
+import us.pixelmemory.kevin.sdr.firfilters.QuarterWaveDelay;
+import us.pixelmemory.kevin.sdr.firfilters.SingleFilter;
 import us.pixelmemory.kevin.sdr.iirfilters.RCLowPass;
-import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIQ;
-import us.pixelmemory.kevin.sdr.resamplers.DownsamplerIdentifier;
-import us.pixelmemory.kevin.sdr.tuners.FrequencyShift;
-import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
+import us.pixelmemory.kevin.sdr.resamplers.DownsamplerArray;
+import us.pixelmemory.kevin.sdr.tuners.ScaledClock;
 
-/**
- * The success rate of binary data extraction sucks.
- */
-public final class RDSDecoder implements FloatConsumer<RuntimeException> {
-	public static final float rdsFrequency = 57000f;
-	private static final boolean debugVisualEnable = false;
+
+public final class RDSDecoder {
+	public static final float pilotFrequency = 19000f;
+	public static final float rdsBandFrequency = pilotFrequency * 3f;
+	public static final float rdsClockRate = 1187.5f;
+	public static final float rdsLowPass = 2100; // 2400Hz is the specification
+	public static final float ifSampleRate = 14250f;//pilotFrequency;
+	private static final boolean debugVisualEnable = true;
 	private static final boolean debugDecodeEnable = true;
-	private static final boolean liveDebug = true;
+	private static final boolean liveDebug = false;
 
 	private static final float rdsRate = 1187.5f; // This is the data rate. The encoding is double-rate.
-	private static final float intermediateFrequency1 = 19000f; //PLL, filtering
-	private static final int digitalOversample = 8;
-	private static final float intermediateFrequency2 = rdsRate * digitalOversample; //Manchester decoder
-	private final DownsamplerIdentifier<RuntimeException> secondDownsample;
+	
+	private final DownsamplerArray<RuntimeException> ifDownsampler;
+	private final float[] downsamplerArray= new float[3];
+	private final QuarterWaveDelay loopNotchFilter1;
+	private final QuarterWaveDelay loopNotchFilter2;
+	private final ScaledClock rdsDataClock;
 
-	private final SingleFilterIQ bandpass;
-	private final PhaseLock pskTuner;
-	private final IQSample bandpassIQ = new IQSample();
-	private final IQSample tunerIQ = new IQSample();
+	private final SingleFilter rdsLowPassFilter;
 	private final DifferentialManchesterDecoder<RuntimeException> diffManchesterDecoder;
-	private final FloatConsumer<RuntimeException> inputProcessor;
 	private final RCLowPass gainLowPass;
+
+	private double lastRdsClock = 0d;
+	private double rdsPhaseAdj = 0d;
+	private double integrator = 0d;
 
 	private int register = 0; // 26 bits, 16 data + 10 CRC
 	private int registerSize = 0;
@@ -55,98 +54,109 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	private final ProgramInformation programInfo = new ProgramInformation();
 
 	private final IQVisualizer vis;
-	
+
 	public RDSDecoder(final float sampleRate) {
-		// Step 3. Downsample to the first intermediate frequency.
-		final DownsamplerIQ<RuntimeException> firstDownsample = new DownsamplerIQ<>(LanczosTable.of(3), sampleRate, intermediateFrequency1, this::acceptIntermediateFrequency);
+		rdsDataClock = new ScaledClock(rdsClockRate / pilotFrequency);
 		
-		// Step 2. Shift 57kHz +/- 2kHz to 0Hz +/- 2KHz. There's no phase lock yet.  Feed to the downsampler.
-		final IQSampleConsumer<RuntimeException> frequencyShiftTuner = new FrequencyShift (sampleRate, -rdsFrequency).asConsumer(firstDownsample); // 57kHz -> 0Hz
+		ifDownsampler = new DownsamplerArray<>(LanczosTable.of(4), sampleRate, ifSampleRate, 3, this::acceptIfSamples);
 		
-		// Step 1. Fake an IQ sample from the 57kHz narrowband signal
-		//inputProcessor= new TimeShiftToQuadrature(sampleRate, rdsFrequency).asConsumer(frequencyShiftTuner);
-		inputProcessor= new FlatToQuadrature().asConsumer(frequencyShiftTuner);
+		rdsLowPassFilter = new SingleFilter(ifSampleRate, new LowPass(LanczosTable.of(4), rdsLowPass));
 
-
-		// Step 4. Narrow lowpass the first intermediate frequency to preserve slight +/- deviations from 0Hz.  1.8
-		bandpass = new SingleFilterIQ(intermediateFrequency1, new LowPass(LanczosTable.of(64), 1.9f*rdsRate)); 
-
-		// Step 5. Decode the binary phase shift keying (BPSK) into 0 and 1.
-		// There's a big frequency downshift so it's unstable.
-		pskTuner= new PhaseLock (intermediateFrequency1, 1f, 4, 2, debugVisualEnable);
-
-		// Step 6. Downsample the 0 and 1 stream to debounce edge transitions.
-		secondDownsample = new DownsamplerIdentifier<>(LanczosTable.of(4), intermediateFrequency1, intermediateFrequency2, this::acceptDownsampled);
+		// These time delays cancel out strong the 2x and 4x frequency harmonics in the phase error calculation.
+		// This is much more efficient than a low pass filter.
+		loopNotchFilter1 = new QuarterWaveDelay(ifSampleRate, rdsRate);
+		loopNotchFilter2 = new QuarterWaveDelay(ifSampleRate, rdsRate * 2f);
 
 		// Step 7. Differential Manchester Decoding on the stream of 1 and 0. 01 and 10 -> true, 00 and 11 -> false.
-		diffManchesterDecoder = new DifferentialManchesterDecoder<>(digitalOversample, true, this::acceptBinaryBit);
+		diffManchesterDecoder = new DifferentialManchesterDecoder<>(false);
 
-		vis = debugVisualEnable ? new IQVisualizer() : null;
+		vis = debugVisualEnable ? new IQVisualizer(4) : null;
 		if (debugVisualEnable && !liveDebug) {
-			vis.syncOnColor(Color.green);
+			vis.syncOnColor(Color.red);
 		}
+
+		//AGC is somehow very sensitive.  Some stations have massive AM.
+		gainLowPass = new RCLowPass(ifSampleRate, 0.001); //0.0002 for 98.5
+		gainLowPass.setValue(0.01);
+	}
+
+	/**
+	 * Make some clocks, tune RDS from the 57kHz modulation, and then downsample everything.  The source sample rate is potentially extremely high.
+	 * @param f
+	 * @param pilotClock
+	 */
+	public void accept(final float f, final double pilotClock) {
+		final double demodClock= rdsDataClock.tickAndGet(pilotClock, rdsPhaseAdj);
+		downsamplerArray[0]=  (float) (f * Math.sin(3 * pilotClock)); //Raw demodulation
+		downsamplerArray[1]=(float)Math.sin(demodClock); 		//Demod carrier
+		downsamplerArray[2]=(float)Math.sin(2 * demodClock);	//Phase lock double carrier
+		ifDownsampler.accept(downsamplerArray);
+	}
+	
+	/**
+	 * RDS recommends an "integrate and dump" to fix artifacts from BPSK with fast transitions. The fast
+	 * transitions create frequencies that are not sent by all stations. Integration recovers them.
+	 * The "dump" is sending the integration to the output and resetting it to zero.
+	 * A simplified Costas loop finds the pilot phase offset needed for perfect "dump" timing.
+	 * The 57 kHz BPSK modulation is 3 times the 19kHz pilot, and the 1187.5 Hz BPSK clock is 1/16 the pilot.
+	 * Demodulate the 57kHz (19kHz * 3) signal, low pass filter, and AGC.
+	 */
+	private void acceptIfSamples (final float f[]) {
+		final float rawDemodulation= f[0];
+		final float demodCarrier= f[1];
+		final float phaseLockDoubleCarrier= f[2];
 		
-		gainLowPass = new RCLowPass(intermediateFrequency1, 10*rdsRate);
-	}
+		final float modulationNoAGC = rdsLowPassFilter.apply(rawDemodulation);
+		final float modulation = 0.5f * modulationNoAGC / SimplerMath.clamp(gainLowPass.apply(Math.abs(modulationNoAGC)), 0.000001f, 100f);
+		
+		//Remove the modulation from the encoded signal with the 1187.5 Hz clock.
+		final float signal = modulation * demodCarrier;
 
-	/**
-	 * Accept the raw signal from FMBroadcastOld.
-	 * Frequency shift and downsample.
-	 */
-	@Override
-	public void accept(final float f) {
-		// This isn't quite legit because it's going to fake the quadrature phase from a phase shift signal.
-		// A high sample rate helps make the phase shift signal smaller.
-		inputProcessor.accept(f);
-	}
+		// The bounce after a phase shift may be weak, missing, or even slightly inverted on some stations.
+		// Integration fixes it.
+		integrator += signal;
+		if ((demodCarrier <= 0) && (lastRdsClock > 0)) {
+			// Rising tick. Send integrated signal and reset.
+			acceptBinaryBit(diffManchesterDecoder.apply(integrator >= 0));
+			integrator = 0;
+		}
+		lastRdsClock = demodCarrier;
 
-	/**
-	 * Accept the downsampled intermediate signal.
-	 * Bandpass, tune, and then downsample the tuned data to de-bounce.
-	 *
-	 * @param iq
-	 */
-	void acceptIntermediateFrequency(final IQSample iq) {
-//		try {
-//			Thread.sleep(10);
-//		} catch (InterruptedException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-		bandpass.accept(iq, bandpassIQ);
-		bandpassIQ.multiply(0.04f * SimplerMath.clamp(1f/gainLowPass.apply(bandpassIQ.magnitude()), 0.001f, 1000f));
-		pskTuner.accept(bandpassIQ, tunerIQ);
-		secondDownsample.accept(pskTuner.getLastPoint());
-	}
-
-	/**
-	 * Accept the downsampled PSK constellation code (0, 1)
-	 * Send it to the DifferentialManchesterDecoder
-	 *
-	 * @param value constellation code (0, 1)
-	 */
-	private void acceptDownsampled(final int value) {
-		diffManchesterDecoder.accept(value == 1);
+		// Costas loop. Phase shift the carrier-follower clock.
+		// This loop is simplified because intermediate high frequencies are OK with so much oversampling.
+		// This phase locks at 2x frequency (2x clock and signal^2) so that 180 degree phase inversions at 1x frequency become irrelevant 360 degree inversions.
+		final float feedback = modulation * modulation * phaseLockDoubleCarrier;
+		final float notchedFeedback1 = feedback + loopNotchFilter1.delay(feedback);
+		final float notchedFeedback2 = notchedFeedback1 + loopNotchFilter2.delay(notchedFeedback1);
+		rdsPhaseAdj = 0.00007d * notchedFeedback2 / (lockCount +1);
+		
 		if (debugVisualEnable) {
-			vis.drawAnalog(Color.red, 2 + value);
+			if (liveDebug) {
+				vis.fadeLight();
+			}
+			
+			vis.drawAnalog(Color.cyan, lockCount / 40f);
+
+			vis.drawAnalog(Color.red, modulation);
+			vis.drawAnalog(Color.orange, 2f + signal);
+			vis.drawAnalog(Color.yellow, 5f + 0.2f*(float) integrator);
+			vis.drawAnalog(Color.blue, 5f + (float) (4000 * rdsPhaseAdj));
+			vis.drawAnalog(Color.darkGray, 5f);
+
+			vis.drawAnalog(Color.lightGray, demodCarrier);
+
+			if (liveDebug) {
+				vis.repaint();
+			}
 		}
 	}
 
 	/**
-	 * Accept binary bit from the DifferentialManchesterDecoder
+	 * Accept a binary bit of the demodulated RDS data stream
 	 *
 	 * @param value bit
 	 */
 	private void acceptBinaryBit(final boolean value) {
-		if (debugVisualEnable) {
-			for (int i = 0; i < digitalOversample; ++i) {
-				vis.drawAnalog(Color.green, value ? 4.5f : 4);
-			}
-			if (liveDebug) {
-				vis.repaint();
-				vis.fadeLight();
-			}
-		}
 		// Load up the register
 		register = (register << 1) | (value ? 0 : 1);
 		registerSize++;
@@ -161,7 +171,9 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 				lockCount = Math.min(lockCount + 1, lockCountLimit);
 				offsetBlock = currentOffset;
 				registerSize = 0; // Consume
-				// System.out.println("RDS good");
+				if (debugVisualEnable) {
+					System.out.println("RDS good");
+				}
 			} else {
 				// A bad register
 				lockCount = Math.max(lockCount - 1, 0);
@@ -170,8 +182,13 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 					// Keep going. Maybe it will correct.
 					offsetBlock = currentOffset;
 					registerSize = 0; // Consume
+					if (debugVisualEnable) {
+						System.out.println("RDS bad, continue");
+					}
 				} else {
-					// System.out.println("RDS search");
+					if (debugVisualEnable) {
+						System.out.println("RDS search");
+					}
 					// Search again
 					registerSize = 25;
 					offsetBlock = null;
@@ -195,10 +212,14 @@ public final class RDSDecoder implements FloatConsumer<RuntimeException> {
 	 * @param word Error corrected data for the current block
 	 */
 	private void acceptBlock(final int word) {
+		if (debugVisualEnable && (word & RDS_CRC.possibleErrorFlag) == 0) {
+			System.out.println("Possible error");
+		}
+
 		switch (offsetBlock) {
 			case A -> {
-				if ((word & RDS_CRC.possibleErrorFlag) == 0) {
-					//Use last value if there may be an error
+				if ((word & RDS_CRC.possibleErrorFlag) != 0) {
+					// Use last value if there may be an error
 					blockA = word;
 				}
 			}

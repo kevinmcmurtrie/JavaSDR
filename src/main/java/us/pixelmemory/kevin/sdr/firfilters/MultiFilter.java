@@ -95,9 +95,28 @@ public final class MultiFilter<T extends Throwable> implements FloatConsumer<T> 
 		}
 		out.accept(results);
 	}
+	
+	public void accept(final float f, final float extraField) throws T {
+		extraCircBuf[pos][0]= extraField;
+		circBuf[pos] = f;
 
-	public void accept(final float f, final float... extraFields) throws T {
-		System.arraycopy(extraFields, 0, extraCircBuf[pos], 0, extraFields.length);
+		final int sampleIdx = (pos - sampleLatency) & (circBuf.length - 1);
+		pos = (pos + 1) & (circBuf.length - 1);
+		for (int filterIdx = 0; filterIdx < filters.length; ++filterIdx) {
+			results[filterIdx] = filters[filterIdx].apply(circBuf, sampleIdx);
+		}
+
+		final float[] extras = extraCircBuf[sampleIdx];
+		if (extras != null) {
+			System.arraycopy(extras, 0, results, filters.length, extras.length);
+		}
+
+		out.accept(results);
+	}
+
+	public void accept(final float f, final float extraField, final float... extraFields) throws T {
+		extraCircBuf[pos][0]= extraField;
+		System.arraycopy(extraFields, 0, extraCircBuf[pos], 1, extraFields.length);
 		circBuf[pos] = f;
 
 		final int sampleIdx = (pos - sampleLatency) & (circBuf.length - 1);
