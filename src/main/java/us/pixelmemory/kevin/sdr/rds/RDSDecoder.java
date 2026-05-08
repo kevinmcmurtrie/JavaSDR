@@ -161,7 +161,7 @@ public final class RDSDecoder {
 		register = (register << 1) | (value ? 0 : 1);
 		registerSize++;
 
-		if (registerSize == 26) {
+		if (registerSize >= 26) {
 			// Figure out ABCD block sync using the injected CRC error.
 			// An error-free signal is needed to get started.
 			final var currentOffset = nextOffset();
@@ -190,7 +190,6 @@ public final class RDSDecoder {
 						System.out.println("RDS search");
 					}
 					// Search again
-					registerSize = 25;
 					offsetBlock = null;
 				}
 			}
@@ -199,9 +198,8 @@ public final class RDSDecoder {
 				if (debugDecodeEnable) {
 					System.out.println(offsetBlock);
 				}
-				// FIXME - check that error correction worked.
-				// Remove the injected CRC error and error correct.
-				acceptBlock(RDS_CRC.decode(register, offsetBlock.offsetWord));
+				
+				acceptBlock(RDS_CRC.errorCorrect(register, offsetBlock.offsetWord));
 			}
 		}
 	}
@@ -212,7 +210,7 @@ public final class RDSDecoder {
 	 * @param word Error corrected data for the current block
 	 */
 	private void acceptBlock(final int word) {
-		if (debugVisualEnable && (word & RDS_CRC.possibleErrorFlag) == 0) {
+		if (debugVisualEnable && (word & RDS_CRC.possibleErrorFlag) != 0) {
 			System.out.println("Possible error");
 		}
 

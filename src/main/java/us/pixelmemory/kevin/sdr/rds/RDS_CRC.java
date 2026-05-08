@@ -1,17 +1,17 @@
 package us.pixelmemory.kevin.sdr.rds;
 
 public class RDS_CRC {
+	// MessagebitsCheckbits
 
 	// From RDS specification
 	private static final int G = 0x5b9; // bits (10 8 7 5 4 3) + 1
-	// private static final int moduloG = 0x31b; // bits (9 8 4 3 2 1) + 1
-	private static final int errorMask = 0x1f;
-	private static final int syndromeBits = 10;
-	private static final int syndromeMask = (1 << syndromeBits) - 1;
+	private static final int checkBits = 10;
+	private static final int checkMask = (1 << checkBits) - 1;
 	private static final int messageBits = 16;
-
+	private static final int totalBits = checkBits + messageBits;
+	public static final int registerMask = (1 << totalBits) - 1;
 	public static final int messageMask = (1 << messageBits) - 1;
-	public static final int possibleErrorFlag = 1 << 30;	//The corrected message may have damage if this bit is set.
+	public static final int possibleErrorFlag = 1 << 30; // The corrected message may have damage if this bit is set.
 
 	private static final int G16[] = { /**/
 			0b00000000000000010110111001, /**/
@@ -101,17 +101,12 @@ public class RDS_CRC {
 	 */
 	public static final int extractSyndrome(final int codeword) {
 		int acc = 0;
-		for (int oc = 0; oc < syndromeBits; ++oc) {
+		for (int oc = 0; oc < checkBits; ++oc) {
 			final int masked = codeword & H16[oc];
 			acc |= (Integer.bitCount(masked) & 1) << oc;
 		}
 		return acc;
 	}
-
-	// Decode syndrome
-	// Sync syndrome to offset A,B, C/C', or D pattern
-	// XOR away offset once synced to pattern
-	// use syndrome to correct future errors
 
 	/**
 	 * Multiply by 2^syndromeBits (0x400) and divide by G
@@ -128,22 +123,59 @@ public class RDS_CRC {
 				syndrome ^= G16[i];
 			}
 		}
-		return ((message & messageMask) << syndromeBits) | ((syndrome ^ offset) & syndromeMask);
+		return ((message & messageMask) << checkBits) | ((syndrome ^ offset) & checkMask);
+	}
+
+	public static void main(final String args[]) {
+		// 1938241001
+
+		// for (int i= 0; i < (1 << 26); ++i) {
+		// int c= extractSyndromeFromC(i);
+		// int j= extractSyndrome(i);
+		//
+		// if (c != j) {
+		// System.out.println(i);
+		// }
+		// }
+		//
+
+		final int registerOrig = 1937978857;
+
+		System.out.println("Orig: " + messageBitsOfRegister(registerOrig) + ":" + checkBitsOfRegister(registerOrig));
+		System.out.println("Orig decode : " + errorCorrect(registerOrig, Offset.Ca.offsetWord));
+
+		for (int bit = 0; bit < 26; ++bit) {
+
+			final int register = registerMask & (registerOrig ^ (0x1f << bit));
+
+			final int codeIndicator = extractSyndrome(register);
+
+			Offset code = Offset.ofSyndrome(codeIndicator);
+			if (code == null) {
+				code = Offset.Ca;
+			}
+
+			System.out.println("Java Bit :" + bit + " Test: " + (messageMask & errorCorrect(register, Offset.Ca.offsetWord)));
+		}
+
+	}
+
+	static int checkBitsOfRegister(final int register) {
+		return register & checkMask;
+	}
+
+	static int messageBitsOfRegister(final int register) {
+		return (register >>> checkBits) & messageMask;
 	}
 
 	/**
-	 * Correct for bursts (consecutive) errors. The offset must be known so it may be removed.
-	 * Don't work well for non-adjacent errors.
+	 * Correct up to 5 consecutive errors in received RDS register.
 	 *
-	 * @param message Up to 16 bits of message plus 10 bits of error correction
-	 * @param offset 10 bits of syndrome XOR used to synchronize the bitstream.
-	 * @return Decoded and corrected (as much as possible) value
+	 * @param register
+	 * @param offset
+	 * @return
 	 */
-	public static int decode(final int encodedMessage, final int offset) {
-		return decodeMessage((encodedMessage >>> syndromeBits) & messageMask, extractSyndrome(encodedMessage ^ offset) & syndromeMask);
-	}
-
-	private static int decodeMessage(int message, int syndrome) {
+	static int errorCorrect(final int register, final int offset) {
 		/*
 		 * The following coded with help from <a href='https://the-art-of-ecc.com/3_Cyclic_BCH/RBDS.c'>The Art of Error Correcting Coding</a>
 		 * <code>ISBN 0471 49581 6</code>
@@ -151,11 +183,14 @@ public class RDS_CRC {
 		 * The RDS spec references books that aren't online.
 		 */
 
+		int message = messageBitsOfRegister(register);
+		int syndrome = extractSyndrome(register ^ offset);
+
 		// Correct for error bursts
 		for (int i = 15; i >= 0; --i) {
 			// When the five left-most stages in the syndrome-register are all zero a possible error burst with
 			// a maximum length of five bits must lie in the five right-hand stages of the message.
-			if ((syndrome & errorMask) == 0) {
+			if ((syndrome & 0x1f) == 0) {
 				message ^= ((syndrome & 0x200) >>> 9) << i;
 				syndrome <<= 1;
 			} else {
@@ -166,6 +201,14 @@ public class RDS_CRC {
 			}
 		}
 
-		return (syndrome == 0) ? message : (message | possibleErrorFlag);
+		if (syndrome != 0) {
+			// Made corrections
+			// If the syndrome spans more than 5 bits it probably failed
+			if (Integer.numberOfLeadingZeros(syndrome) + Integer.numberOfTrailingZeros(syndrome) < (32 - 5)) {
+				return (message & messageMask) | possibleErrorFlag;
+			}
+		}
+
+		return message & messageMask;
 	}
 }

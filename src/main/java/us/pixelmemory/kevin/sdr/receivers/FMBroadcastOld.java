@@ -19,7 +19,7 @@ import us.pixelmemory.kevin.sdr.rds.RDSDecoder;
 import us.pixelmemory.kevin.sdr.tuners.PhaseLock;
 
 public class FMBroadcastOld<T extends Throwable> implements FloatConsumer<T> {
-	private static final boolean enableDebug = true;
+	private static final boolean enableDebug = false;
 
 	private static final float pilotFrequency = 19000f;
 
