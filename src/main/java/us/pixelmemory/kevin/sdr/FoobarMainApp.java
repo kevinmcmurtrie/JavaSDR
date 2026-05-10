@@ -45,7 +45,7 @@ public class FoobarMainApp {
 		
 		
 		
-		final String theFile= talk;
+		final String theFile= highStereo;
 		
 		
 //		class BAOS extends ByteArrayOutputStream {

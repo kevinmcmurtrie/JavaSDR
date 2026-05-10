@@ -10,7 +10,7 @@ import us.pixelmemory.kevin.sdr.tuners.Clock;
  * Lanczos A should be a higher level for narrower bands. If the bandwidth is too narrow and the Lanczos level too low,
  * there will be out of band ringing that goes in and out of phase. These are the ripple ends of the Lanczos excessively amplified.
  */
-public record BandPass(LanczosTable lanczos, float lowBand, float highBand) implements FilterBuilder {
+public record BandPass(LanczosTable lanczos, float lowCut, float highCut) implements FilterBuilder {
 
 	public static void main(final String args[]) throws InterruptedException {
 		final float sampleRate = 1000000;
@@ -52,14 +52,14 @@ public record BandPass(LanczosTable lanczos, float lowBand, float highBand) impl
 		// IQVisualizer vis = new IQVisualizer();
 
 		// Lanczos distance for half wave
-		final int lowLatency = (int) Math.ceil(0.5 * lanczos.A * sampleRate / lowBand);
-		final int highLatency = (int) Math.ceil(0.5 * lanczos.A * sampleRate / highBand);
-		final float lowScale = (float) (2d * lowBand / sampleRate);
-		final float highScale = (float) (2d * highBand / sampleRate);
+		final int lowLatency = (int) Math.ceil(0.5 * lanczos.A * sampleRate / lowCut);
+		final int highLatency = (int) Math.ceil(0.5 * lanczos.A * sampleRate / highCut);
+		final float lowScale = (float) (2d * lowCut / sampleRate);
+		final float highScale = (float) (2d * highCut / sampleRate);
 
 		// Test run at center frequency to get filter gain.
 		// I don't know the formula to compensate for the gain drifting as lowScale and highScale converge.
-		final double clockRate = (lowBand + highBand) * Math.PI / sampleRate;
+		final double clockRate = (lowCut + highCut) * Math.PI / sampleRate;
 		if (Math.abs(clockRate) >= Math.PI) {
 			throw new IllegalArgumentException("Sample rate too low");
 		}

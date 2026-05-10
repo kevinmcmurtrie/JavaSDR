@@ -2,6 +2,7 @@ package us.pixelmemory.kevin.sdr.rds.groups;
 
 import java.util.Arrays;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import us.pixelmemory.kevin.sdr.rds.CharacterTable;
 import us.pixelmemory.kevin.sdr.rds.RDS_CRC;
@@ -46,6 +47,7 @@ public class T0X implements GroupHandler {
 	private boolean artificialHead; // Undefined
 	private boolean compressed; // Undefined
 	private boolean dynamicPTY; // Undefined
+	private final AtomicReference<String> cachedText= new AtomicReference<>(null);
 	// Alternate frequency unimplemented
 
 	public T0X() {
@@ -64,25 +66,18 @@ public class T0X implements GroupHandler {
 	@SuppressWarnings("incomplete-switch")
 	@Override
 	public void accept(final int a, final int b, final int c, final int d) {
-		final int idx = b & 3;
-		final boolean dcb = ((b >> 2) & 1) != 0;
+		final int idx = b & 3; //Switches flag and character location
+		final boolean dcb = ((b >> 2) & 1) != 0; //The flag
 		switch (idx) {
 			case 0 -> dynamicPTY = dcb;
 			case 1 -> compressed = dcb;
 			case 2 -> artificialHead = dcb;
 			case 3 -> stereo = dcb;
 		}
-		setCharacters(idx, d);
+		setCharacters(idx, d); //The characters
 	}
 
 	private void setCharacters(final int idx, final int d) {
-		if ((d & RDS_CRC.possibleErrorFlag) != 0) {
-			//Hope the idx is OK but don't trust bad characters
-			name[idx * 2] = ' ';
-			name[idx * 2 + 1] = ' ';
-			return;
-		}
-		
 		if (d == 0x0F0F) {
 			charset[idx] = 0;
 		} else if (d == 0x0E0E) {
@@ -92,12 +87,23 @@ public class T0X implements GroupHandler {
 		} else {
 			name[idx * 2] = CharacterTable.getCharacter(charset[idx], (d >>> 8) & 0xFF);
 			name[idx * 2 + 1] = CharacterTable.getCharacter(charset[idx], d & 0xFF);
+			cachedText.set(null);
 		}
 	}
 
 	@Override
 	public String toString() {
-		return "T0X [name=" + new String(name).trim() + ", stereo=" + stereo + ", artificialHead=" + artificialHead + ", compressed=" + compressed + ", dynamicPTY=" + dynamicPTY + "]";
+		return "T0X [name=" + getText () + ", stereo=" + stereo + ", artificialHead=" + artificialHead + ", compressed=" + compressed + ", dynamicPTY=" + dynamicPTY + "]";
+	}
+	
+	public String getText() {
+		String text = cachedText.get();
+		if (text == null) {
+			text = new String(name).trim();
+			cachedText.compareAndSet(null, text);
+		}
+
+		return text;
 	}
 
 	@Override

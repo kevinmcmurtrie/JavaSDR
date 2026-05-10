@@ -49,7 +49,7 @@ public class RDS_CRC {
 			0b10000000001001111101100111 /**/
 	};
 
-	public enum Offset { /* */
+	public enum Block { /* */
 		A(0b0011111100, 0b1111011000), /* */
 		B(0b0110011000, 0b1111010100), /* */
 		Ca(0b0101101000, 0b1001011100), /* */
@@ -60,12 +60,12 @@ public class RDS_CRC {
 		public final int offsetWord;
 		public final int syndrome;
 
-		private Offset(final int offsetWord, final int syndrome) {
+		private Block(final int offsetWord, final int syndrome) {
 			this.offsetWord = offsetWord;
 			this.syndrome = syndrome;
 		}
 
-		public static Offset ofWord(final int word) {
+		public static Block ofWord(final int word) {
 			return switch (word) {
 				case 0b0011111100 -> A;
 				case 0b0110011000 -> B;
@@ -77,7 +77,7 @@ public class RDS_CRC {
 			};
 		}
 
-		public static Offset ofSyndrome(final int word) {
+		public static Block ofSyndrome(final int word) {
 			return switch (word) {
 				case 0b1111011000 -> A;
 				case 0b1111010100 -> B;
@@ -142,7 +142,7 @@ public class RDS_CRC {
 		final int registerOrig = 1937978857;
 
 		System.out.println("Orig: " + messageBitsOfRegister(registerOrig) + ":" + checkBitsOfRegister(registerOrig));
-		System.out.println("Orig decode : " + errorCorrect(registerOrig, Offset.Ca.offsetWord));
+		System.out.println("Orig decode : " + errorCorrect(registerOrig, Block.Ca.offsetWord));
 
 		for (int bit = 0; bit < 26; ++bit) {
 
@@ -150,12 +150,12 @@ public class RDS_CRC {
 
 			final int codeIndicator = extractSyndrome(register);
 
-			Offset code = Offset.ofSyndrome(codeIndicator);
+			Block code = Block.ofSyndrome(codeIndicator);
 			if (code == null) {
-				code = Offset.Ca;
+				code = Block.Ca;
 			}
 
-			System.out.println("Java Bit :" + bit + " Test: " + (messageMask & errorCorrect(register, Offset.Ca.offsetWord)));
+			System.out.println("Java Bit :" + bit + " Test: " + (messageMask & errorCorrect(register, Block.Ca.offsetWord)));
 		}
 
 	}
